@@ -1,0 +1,16 @@
+[Unit]
+Description=electron-build-server - build Electron applications in a distributable format.
+Documentation=https://www.electron.build
+After=network.target
+
+Requires=electron-build.socket
+
+[Service]
+EnvironmentFile=/etc/electron-build-service.env
+Type=simple
+User=app
+ExecStart=/usr/local/bin/node /home/app/electron-build-server/out/main.js
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

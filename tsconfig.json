@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "es2017",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitReturns": true,
+    "inlineSources": true,
+    "sourceMap": true,
+    "allowSyntheticDefaultImports": true,
+    "newLine": "lf",
+    "skipLibCheck": true,
+    "noEmitOnError": true,
+    "outDir": "out"
+  },
+  "include": [
+    "src/**/*.ts"
+  ]
+}

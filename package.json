@@ -1,0 +1,33 @@
+{
+  "name": "electron-build-server",
+  "version": "0.0.1",
+  "description": "Electron Application Build Server",
+  "main": "src/main.js",
+  "license": "MIT",
+  "scripts": {
+    "compile": "tsc",
+    "//": "REDIS_ENDPOINT and ELECTRON_BUILD_SERVICE_PORT (443 by default, so, on a local machine set to 8443) envs are required",
+    "start": "yarn compile && node out/main.js",
+    "docker-image": "docker build -t electronuserland/build-server .",
+    "aci-image": "docker2aci docker://electronuserland/build-server",
+    "start-docker": "docker run -p 8443:443 --rm electronuserland/build-server",
+    "///": "https://github.com/hashicorp/packer/issues/4587#issuecomment-282916068",
+    "prepare-pack-app": "git archive master -o /tmp/app.tar.gz",
+    "image": "yarn prepare-pack-app && ./scripts/private/build-do-image.sh",
+    "push-docker": "docker push electronuserland/build-server"
+  },
+  "dependencies": {
+    "async-exit-hook": "^2.0.1",
+    "builder-util": "^3.2.2",
+    "bull": "^3.3.6",
+    "electron-builder": "19.45.6",
+    "fs-extra-p": "^4.4.4"
+  },
+  "devDependencies": {
+    "@types/bull": "^3.0.2",
+    "@types/node": "^8.0.51",
+    "electron-builder-tslint-config": "^1.1.0",
+    "tslint": "^5.8.0",
+    "typescript": "^2.6.1"
+  }
+}

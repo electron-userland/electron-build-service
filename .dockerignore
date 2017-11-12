@@ -1,0 +1,8 @@
+.idea
+.git
+node_modules
+out
+test
+electron-build-server.iml
+aci.sh
+.gitignore
