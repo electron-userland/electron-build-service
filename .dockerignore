@@ -3,6 +3,9 @@
 node_modules
 out
 test
-electron-build-server.iml
-aci.sh
+*.iml
+*.tf
+*.md
 .gitignore
+.terraform
+terraform.*

@@ -1,60 +1,33 @@
 {
   "variables": {
-    "do_api_key": "",
     "certs_dir": "",
     "certs_dest_dir": "/home/app/electron-build-server/certs"
   },
   "builders": [
     {
-      "type": "digitalocean",
-      "api_token": "{{user `do_api_key`}}",
-      "image": "ubuntu-17-10-x64",
-      "region": "fra1",
-      "size": "512mb",
-      "monitoring": true,
-      "ssh_username": "app",
-      "snapshot_name": "electron-build-service-{{timestamp}}",
-      "user_data_file": "scripts/cloud-config.yml"
+      "type": "vultr",
+      "description": "electron-builder-service base",
+      "api_key": "{{user `vultr_api_key`}}",
+      "script_id": 223441,
+      "region_name": "Frankfurt",
+      "plan_name": "1024 MB RAM",
+      "ssh_username": "rancher"
     }
   ],
   "provisioners": [
     {
       "type": "file",
-      "source": "/tmp/app.tar.gz",
-      "destination": "/tmp/app.tar.gz"
+      "source": "scripts/private/rc.local",
+      "destination": "/tmp/rc.local"
     },
     {
       "type": "file",
-      "source": "scripts/systemd",
-      "destination": "/tmp"
-    },
-    {
-      "type": "file",
-      "source": "scripts/private/electron-build-service.env",
-      "destination": "/tmp/electron-build-server.env"
+      "source": "scripts/sshd_config",
+      "destination": "/tmp/sshd_config"
     },
     {
       "type": "shell",
-      "script": "./scripts/prepare.sh"
-    },
-    {
-      "type": "shell",
-      "script": "./scripts/private/setup-logging.sh"
-    },
-    {
-      "type": "file",
-      "source": "{{user `certs_dir`}}/ca.crt",
-      "destination": "{{user `certs_dest_dir`}}/ca.crt"
-    },
-    {
-      "type": "file",
-      "source": "{{user `certs_dir`}}/node.crt",
-      "destination": "{{user `certs_dest_dir`}}/node.crt"
-    },
-    {
-      "type": "file",
-      "source": "{{user `certs_dir`}}/node.key",
-      "destination": "{{user `certs_dest_dir`}}/node.key"
+      "script": "/scripts/prepare.sh"
     }
   ]
 }

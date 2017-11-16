@@ -1,4 +1,5 @@
-import { computeEnv, getLinuxToolsPath } from "builder-util/out/bundledTool"
+import { computeEnv } from "builder-util/out/bundledTool"
+import { getAppImage, getLinuxToolsPath } from "electron-builder-lib/out/targets/tools"
 import * as path from "path"
 
 // on macOS GNU tar is required
@@ -12,6 +13,8 @@ export async function prepareBuildTools() {
   else {
     process.env.TAR_PATH = "tar"
   }
+
+  await getAppImage()
 }
 
 if (process.mainModule === module) {
