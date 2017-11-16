@@ -1,8 +1,9 @@
-import { Queue } from "bull"
+import { exec } from "builder-util"
+import { Job, Queue } from "bull"
 import { close, createWriteStream, fstat, open } from "fs-extra-p"
 import { constants, IncomingHttpHeaders, ServerHttp2Stream } from "http2"
 import * as path from "path"
-import { BuildTask, BuildTaskResult } from "./builder"
+import { BuildTask, BuildTaskResult, getBuildDir } from "./buildJobApi"
 import { BuildServerConfiguration } from "./main"
 import { Timer } from "./util"
 
@@ -12,6 +13,8 @@ const {
   HTTP_STATUS_OK,
   HTTP_STATUS_INTERNAL_SERVER_ERROR,
 } = constants
+
+let tmpFileCounter = 0
 
 export function handleBuildRequest(stream: ServerHttp2Stream, headers: IncomingHttpHeaders, configuration: BuildServerConfiguration, buildQueue: Queue) {
   const targets = headers["x-targets"]
@@ -31,7 +34,7 @@ export function handleBuildRequest(stream: ServerHttp2Stream, headers: IncomingH
     return
   }
 
-  const archiveFile = path.join(configuration.pendingAppArchiveDir, `${process.pid.toString(16)}-${Date.now().toString(16)}-${Math.floor(Math.random() * 1024 * 1024).toString(16)}.zst`)
+  const archiveFile = configuration.stageDir + path.sep + `${(tmpFileCounter++).toString(16)}.zst`
   doHandleBuildRequest({
     app: archiveFile,
     platform,
@@ -61,6 +64,32 @@ async function doHandleBuildRequest(jobData: BuildTask, stream: ServerHttp2Strea
   })
   fileStream.on("error", errorHandler)
 
+  let job: Job | null = null
+  let isBuilt = false
+  stream.once("streamClosed", () => {
+    async function clean() {
+      const archiveFile = jobData.app
+      const rmArgs = ["-rf", getBuildDir(archiveFile)]
+      if (!isBuilt) {
+        const status = job === null ? null : await job.getState()
+        if (job != null && (status !== "completed" && status !== "failed")) {
+          console.log(`Discard job ${job.id} on unexpected stream closed`)
+          job.discard()
+          rmArgs.push(archiveFile)
+        }
+      }
+
+      if (process.env.KEEP_TMP_DIR_AFTER_BUILD == null) {
+        await exec("rm", rmArgs)
+      }
+    }
+
+    clean()
+      .catch(error => {
+        console.error(`Cannot remove old files on stream closed: ${error.stack || error}`)
+      })
+  })
+
   stream.on("error", errorHandler)
   const uploadTimer = new Timer(`Upload`)
   fileStream.on("finish", () => {
@@ -76,8 +105,13 @@ async function doHandleBuildRequest(jobData: BuildTask, stream: ServerHttp2Strea
         jobData.uploadTime = uploadTimer.end(`Upload (size: ${jobData.archiveSize})`)
         return buildQueue.add(jobData)
       })
-      .then(job => job.finished() as any as Promise<BuildTaskResult>)
+      .then(_job => {
+        job = _job
+        return _job.finished() as any as Promise<BuildTaskResult>
+      })
       .then((data: BuildTaskResult) => {
+        isBuilt = true
+
         if (data.error != null) {
           stream.respond({[HTTP2_HEADER_STATUS]: HTTP_STATUS_OK})
           stream.end(JSON.stringify(data))

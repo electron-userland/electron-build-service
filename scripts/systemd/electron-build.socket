@@ -1,9 +1,0 @@
-[Unit]
-Description=electron-build-server socket
-
-[Socket]
-ListenStream=0.0.0.0:443
-Backlog=1024
-
-[Install]
-WantedBy=sockets.target

@@ -1,37 +1,13 @@
-import { exec } from "builder-util"
+import { doSpawn, exec } from "builder-util"
 import { Job } from "bull"
-import { Packager, PackagerOptions, PublishOptions, UploadTask } from "electron-builder"
+import { Packager, PackagerOptions, PublishOptions } from "electron-builder-lib"
 import { emptyDir, readJson, unlink } from "fs-extra-p"
 import * as path from "path"
+import { ArtifactInfo, BuildTask, BuildTaskResult, getBuildDir } from "./buildJobApi"
 import { Timer } from "./util"
 
-export interface ArtifactInfo extends UploadTask {
-  target: string | null
-
-  readonly isWriteUpdateInfo?: boolean
-  readonly updateInfo?: any
-}
-
-export interface BuildTaskResult {
-  artifacts?: Array<ArtifactInfo>
-  relativePathOffset?: number
-
-  error?: Error
-
-  unarchiveTime: number
-  buildTime: number
-}
-
-export interface BuildTask {
-  app: string
-  platform: string
-  targets: Array<string>
-
-  // only for stats purpose, not required for build
-  uploadTime?: number
-  zstdCompression: number
-  archiveSize?: number
-}
+// we do cleanup in any case, no need to waste nodejs worker time
+//process.env.TMP_DIR_MANAGER_ENSURE_REMOVED_ON_EXIT = "false"
 
 export default async function processor(job: Job): Promise<BuildTaskResult> {
   const data: BuildTask = job.data
@@ -55,8 +31,7 @@ export default async function processor(job: Job): Promise<BuildTaskResult> {
     throw new Error("Archive path not specified")
   }
 
-  // noinspection SpellCheckingInspection
-  const targetDirectory = archivePath.substring(0, archivePath.lastIndexOf("."))
+  const targetDirectory = getBuildDir(archivePath)
   await emptyDir(targetDirectory)
   const unarchiveTimer = new Timer(`Unarchive (${job.id})`)
   await exec(tarPath, ["-I", "zstd", "-xf", archivePath, "-C", targetDirectory])
@@ -94,6 +69,15 @@ export default async function processor(job: Job): Promise<BuildTaskResult> {
 
   try {
     await packager._build(info.configuration, info.metadata, info.devMetadata, info.repositoryInfo)
+    // cleanup using a detached rm command
+    const rmProcess = doSpawn("rm", ["-rf", prepackaged], {
+      detached: true,
+      stdio: "ignore",
+    })
+    rmProcess.on("error", error => {
+      console.error(`Cleanup error: ${error.stack || error}`)
+    })
+
     return {
       artifacts,
       relativePathOffset: targetDirectory.length + "dist".length + 1,
