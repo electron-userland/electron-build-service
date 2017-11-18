@@ -14,8 +14,6 @@ const {
 } = constants
 
 export interface BuildServerConfiguration {
-  readonly stageDir: string
-
   readonly queueName: string
 }
 
@@ -43,8 +41,13 @@ async function main() {
   const port = process.env.ELECTRON_BUILD_SERVICE_PORT ? parseInt(process.env.ELECTRON_BUILD_SERVICE_PORT!!, 10) : 443
   // if port < 1024 it means that we are in the docker container / special server for service, and so, no need to use path qualifier in the tmp dir
   const isDockerOrServer = port < 1024
+  const stageDir = isDockerOrServer ? os.tmpdir() : path.join(os.tmpdir(), "electron-build-server")
+  process.env.STAGE_DIR = stageDir
+  if (process.env.ELECTRON_BUILDER_TMP_DIR == null) {
+    process.env.ELECTRON_BUILDER_TMP_DIR = os.tmpdir()
+  }
+
   const configuration: BuildServerConfiguration = {
-    stageDir: isDockerOrServer ? os.tmpdir() : path.join(os.tmpdir(), "electron-build-server"),
     queueName: `build-${os.hostname()}`
   }
 
@@ -56,7 +59,7 @@ async function main() {
   await Promise.all([
     cancelOldJobs(buildQueue),
     prepareBuildTools(),
-    isDockerOrServer ? Promise.resolve() : emptyDir(configuration.stageDir),
+    isDockerOrServer ? Promise.resolve() : emptyDir(stageDir!),
   ])
 
   const isSandboxed = process.env.SANDBOXED_BUILD_PROCESS !== "false"

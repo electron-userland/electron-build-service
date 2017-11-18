@@ -41,4 +41,4 @@ COPY --from=builder /app .
 VOLUME /app/certs
 EXPOSE 443
 
-CMD [ "node", "/app/out/main.js" ]
+CMD [ "node", "/app/out/main.ts" ]

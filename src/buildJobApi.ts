@@ -19,7 +19,7 @@ export interface BuildTaskResult {
 }
 
 export interface BuildTask {
-  app: string
+  archiveName: string
   platform: string
   targets: Array<string>
 
@@ -29,8 +29,17 @@ export interface BuildTask {
   archiveSize?: number
 }
 
-export function getBuildDir(archiveFile: string): string {
-  const explicitElectronBuilderTmpDir = process.env.ELECTRON_BUILDER_TMP_DIR
+// electron-builder project dir
+export function getBuildDir(archiveName: string): string {
   // for now we use env ELECTRON_BUILDER_TMP_DIR (can be set to docker tmpfs) only for electron-builder, but not to store uploaded app archive (because build job is queued, but upload is not - can be quite a lot downloaded, but not processed uploaded files)
-  return explicitElectronBuilderTmpDir == null ? archiveFile.substring(0, archiveFile.lastIndexOf(".")) : (explicitElectronBuilderTmpDir + path.sep + path.basename(archiveFile, ".zst"))
+  return process.env.ELECTRON_BUILDER_TMP_DIR + path.sep + archiveName.substring(0, archiveName.lastIndexOf("."))
+}
+
+// full path to uploaded app archive file
+export function getArchivePath(archiveName: string): string {
+  const stageDir = process.env.STAGE_DIR
+  if (stageDir == null) {
+    throw new Error("Env STAGE_DIR must be defined")
+  }
+  return stageDir + path.sep + archiveName
 }

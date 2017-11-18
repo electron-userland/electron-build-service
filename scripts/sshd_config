@@ -1,4 +1,0 @@
-PasswordAuthentication no
-ChallengeResponseAuthentication no
-PermitRootLogin no
-AllowGroups docker
