@@ -1,8 +1,10 @@
 import * as Queue from "bull"
 import { emptyDir } from "fs-extra-p"
 import { constants, createSecureServer } from "http2"
+import * as redis from "ioredis"
 import * as os from "os"
 import * as path from "path"
+import { ServiceEntry, ServiceInfo, ServiceRegistry } from "service-registry-redis"
 import { handleBuildRequest } from "./buildHandler"
 import { prepareBuildTools } from "./download-required-tools"
 import { getSslOptions } from "./sslKeyAndCert"
@@ -51,7 +53,23 @@ async function main() {
     queueName: `build-${os.hostname()}`
   }
 
-  const buildQueue = new Queue(configuration.queueName, redisEndpoint.startsWith("redis://") ? redisEndpoint : `redis://${redisEndpoint}`)
+  const redisClient = redis(redisEndpoint.startsWith("redis://") ? redisEndpoint : `redis://${redisEndpoint}`)
+  let subscriber: redis.Redis | null = null
+  const buildQueue = new Queue(configuration.queueName, {
+    createClient: type => {
+      switch (type) {
+        case "client":
+          return redisClient
+        case "subscriber":
+          if (subscriber == null) {
+            subscriber = redisClient.duplicate()
+          }
+          return subscriber
+        default:
+          return redisClient.duplicate()
+      }
+    }
+  })
   buildQueue.on("error", error => {
     console.error(error)
   })
@@ -79,6 +97,8 @@ async function main() {
     handleBuildRequest(stream, headers, configuration, buildQueue)
   })
 
+  let serviceEntry: ServiceEntry | null = null
+
   // callback null if sync exit
   require("async-exit-hook")((callback: (() => void) | null) => {
     console.log("Exit signal received, stopping server and queue")
@@ -92,12 +112,23 @@ async function main() {
       }
     }
 
+    if (serviceEntry != null) {
+      serviceEntry.leave()
+        .catch(error => {
+          console.warn(`Build queue closed (with error: ${error.stack || error})`)
+        })
+    }
+
     server.close(() => {
       serverClosed = true
       closed("Server stopped")
     })
     buildQueue.close()
       .then(() => {
+        redisClient.disconnect()
+        if (subscriber != null) {
+          subscriber.disconnect()
+        }
         queueStopped = true
         closed("Build queue closed")
       })
@@ -112,7 +143,14 @@ async function main() {
     // LISTEN_FDS - systemd socket
     server.listen(process.env.LISTEN_FDS == null ? (port) : {fd: 3}, () => {
       console.log(`Server listening on ${server.address().address}:${server.address().port}, concurrency: ${concurrency}, tmpfs: ${process.env.ELECTRON_BUILDER_TMP_DIR || "no"}, ${JSON.stringify(configuration, null, 2)}`)
-      resolve()
+
+      const serviceRegistry = new ServiceRegistry(redisClient)
+      serviceRegistry.join(new ServiceInfo("builder", "443"))
+        .then(it => {
+          serviceEntry = it
+          resolve()
+        })
+        .catch(reject)
     })
   })
 }

@@ -1,7 +1,7 @@
 .idea
 .git
-node_modules
-out
+**/node_modules
+**/out
 test
 *.iml
 *.tf
@@ -9,3 +9,4 @@ test
 .gitignore
 .terraform
 terraform.*
+**/.bin

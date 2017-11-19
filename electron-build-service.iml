@@ -4,6 +4,8 @@
     <exclude-output />
     <content url="file://$MODULE_DIR$">
       <excludeFolder url="file://$MODULE_DIR$/.terraform" />
+      <excludeFolder url="file://$MODULE_DIR$/packages/electron-build-server/out" />
+      <excludeFolder url="file://$MODULE_DIR$/packages/service-registry-redis/out" />
     </content>
     <orderEntry type="sourceFolder" forTests="false" />
   </component>

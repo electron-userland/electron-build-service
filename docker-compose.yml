@@ -1,0 +1,34 @@
+version: '3.4'
+services:
+  builder:
+    image: electronuserland/build-server
+    volumes:
+      - type: tmpfs
+        target: /tmp/ram
+        volume:
+          nocopy: true
+      - type: bind
+        source: projectData
+        target: /projectData
+        volume:
+          nocopy: true
+    environment:
+      - REDIS_ENDPOINT
+      - DEBUG
+
+  nginx:
+    image: nginx:alpine
+    links:
+      - builder
+    ports:
+      - 8443:443
+    volumes:
+      - type: bind
+        source: projectData
+        target: /projectData
+        volume:
+          nocopy: true
+      - ./certs:/certs:ro
+
+volumes:
+  projectData:

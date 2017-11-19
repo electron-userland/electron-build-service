@@ -1,12 +1,21 @@
 FROM node:8-slim as builder
 
-WORKDIR /app
+WORKDIR /project
 
 COPY package.json yarn.lock ./
+COPY packages/electron-build-server/package.json packages/electron-build-server/
+COPY packages/service-registry-redis/package.json packages/service-registry-redis/
 RUN yarn --frozen-lockfile
-COPY scripts/compile-app.sh /tmp/compile-app.sh
+
 COPY . ./
-RUN /tmp/compile-app.sh
+RUN yarn compile && \
+  yarn --production --frozen-lockfile && \
+  mkdir /app && \
+  yarn pack --cwd packages/electron-build-server --filename /tmp/f.tgz && tar xf /tmp/f.tgz -C /app --strip 1 && \
+  unlink node_modules/service-registry-redis && \
+  unlink node_modules/electron-build-server && \
+  mv node_modules /app/node_modules && \
+  mkdir /app/node_modules/service-registry-redis && yarn pack --cwd packages/service-registry-redis --filename /tmp/f.tgz && tar xf /tmp/f.tgz -C /app/node_modules/service-registry-redis --strip 1
 
 # for snapcraft we must use only <= xenial because otherwise not compatible with xenial (glib version error)
 # have to use ubuntu instead of alpine as a base because of snapcraft
@@ -41,4 +50,4 @@ COPY --from=builder /app .
 VOLUME /app/certs
 EXPOSE 443
 
-CMD [ "node", "/app/out/main.ts" ]
+CMD [ "node", "/app/out/main.js" ]

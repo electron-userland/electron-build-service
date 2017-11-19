@@ -1,0 +1,13 @@
+{
+  "name": "service-registry-redis",
+  "version": "0.0.1",
+  "description": "service-registry-redis",
+  "main": "out/main.js",
+  "files": ["out"],
+  "license": "MIT",
+  "dependencies": {
+    "network-address": "^1.1.2",
+    "ioredis": "^3.2.1"
+  },
+  "typings": "./out/main.d.ts"
+}

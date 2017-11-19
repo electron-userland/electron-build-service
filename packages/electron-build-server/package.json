@@ -1,0 +1,18 @@
+{
+  "name": "electron-build-server",
+  "version": "0.0.1",
+  "description": "Electron Application Build Server",
+  "main": "out/main.js",
+  "files": ["out"],
+  "license": "MIT",
+  "dependencies": {
+    "async-exit-hook": "^2.0.1",
+    "builder-util": "^3.4.0",
+    "bull": "^3.3.6",
+    "electron-builder-lib": "19.46.3",
+    "fs-extra-p": "^4.4.4",
+    "service-registry-redis": "0.0.1",
+    "ioredis": "^3.2.1"
+  },
+  "typings": "./out/main.d.ts"
+}

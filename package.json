@@ -1,28 +1,23 @@
 {
-  "name": "electron-build-server",
-  "version": "0.0.1",
-  "description": "Electron Application Build Server",
-  "main": "src/main.js",
+  "private": true,
   "license": "MIT",
   "scripts": {
-    "compile": "tsc",
+    "compile": "tsc -p packages/service-registry-redis && tsc -p packages/electron-build-server",
+    "////": "verdaccio",
     "//": "REDIS_ENDPOINT and ELECTRON_BUILD_SERVICE_PORT (443 by default, so, on a local machine set to 8443) envs are required",
     "start": "yarn compile && node out/main.js",
-    "docker-build": "docker build -t electronuserland/build-server .",
+    "build": "docker build -t electronuserland/build-server -f packages/electron-build-server/Dockerfile . ",
     "docker-push": "docker push electronuserland/build-server",
     "start-docker": "docker run --mount type=tmpfs,destination=/tmp/ram -e ELECTRON_BUILDER_TMP_DIR=/tmp/ram -e REDIS_ENDPOINT -e DEBUG -p 8443:443 --rm electronuserland/build-server",
     "///": "https://github.com/hashicorp/packer/issues/4587#issuecomment-282916068",
-    "image": "./scripts/private/build-do-image.sh"
+    "image": "./scripts/private/build-do-image.sh",
+    "up": "docker-compose up --abort-on-container-exit"
   },
-  "dependencies": {
-    "async-exit-hook": "^2.0.1",
-    "builder-util": "^3.4.0",
-    "bull": "^3.3.6",
-    "electron-builder-lib": "19.46.1",
-    "fs-extra-p": "^4.4.4",
-    "network-address": "^1.1.2"
-  },
+  "workspaces": [
+    "packages/*"
+  ],
   "devDependencies": {
+    "@types/ioredis": "^3.2.1",
     "@types/node": "^8.0.53",
     "electron-builder-tslint-config": "^1.1.0",
     "tslint": "^5.8.0",
