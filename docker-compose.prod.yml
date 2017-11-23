@@ -1,0 +1,21 @@
+version: '3.4'
+services:
+  builder:
+    image: electronuserland/build-server
+    deploy: &DEPLOY
+      # on each node labeled "builder"
+      # docker node update --label-add builder=true
+      mode: global
+      placement:
+        constraints:
+          - node.labels.builder == true
+    volumes:
+      - /dev/shm/uploaded-projects:/uploaded-projects
+      - /dev/shm/builder-tmp:/builder-tmp
+    environment:
+      - REDIS_ENDPOINT
+      - DEBUG
+      - ELECTRON_BUILDER_TMP_DIR=/builder-tmp
+  nginx:
+      deploy:
+        <<: *DEPLOY

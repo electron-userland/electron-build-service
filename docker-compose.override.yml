@@ -1,0 +1,7 @@
+version: '3.4'
+services:
+  nginx:
+    command: [nginx-debug, '-g', 'daemon off;']
+    ports:
+      # dev nodejs (outside of docker network) should be able to connect to nginx (publish events)
+      - 8001:8001

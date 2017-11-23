@@ -1,0 +1,7 @@
+UsePrivilegeSeparation sandbox
+Subsystem sftp internal-sftp
+UseDNS no
+
+PermitRootLogin no
+AllowUsers core
+AuthenticationMethods publickey

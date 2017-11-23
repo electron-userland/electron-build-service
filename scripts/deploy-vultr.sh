@@ -9,4 +9,5 @@ set -e
 
 # 9 Frankfurt
 # OS 159 custom (to use startup script)
-vultr server create --name=electron-builder-service --hostname=electron-builder-service-green --region=9 --plan=201 --os=159 --script=223441 --user-data=scripts/private/cloud-config.yml --ipv6=true --notify-activate=false
+#vultr server create --name=electron-builder-service --hostname=electron-builder-service-green --region=9 --plan=201 --os=159 --script=223441 --user-data=scripts/private/cloud-config.yml --ipv6=true --notify-activate=false
+vultr server create --name=electron-builder-service --hostname=electron-builder-service-green --region=9 --plan=201 --os=179 --user-data=/Users/develar/Documents/electron-build-service/kontena-cloud.config.yml --ipv6=true --notify-activate=false

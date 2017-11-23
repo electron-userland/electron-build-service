@@ -1,175 +1,203 @@
-import { Queue } from "bull"
-import { Stats } from "fs"
-import { close, createWriteStream, fstat, open } from "fs-extra-p"
-import { constants, IncomingHttpHeaders, ServerHttp2Stream } from "http2"
-import { BuildTask, BuildTaskResult, getArchivePath, getBuildDir } from "./buildJobApi"
-import { BuildServerConfiguration } from "./main"
-import { removeFiles, Timer } from "./util"
+import { Job, Queue } from "bull"
+import { CancellationToken } from "electron-builder-lib"
+import { stat, unlink } from "fs-extra-p"
+import { IncomingMessage, request, RequestOptions, ServerResponse } from "http"
+import * as path from "path"
+import { BuildTask, BuildTaskResult } from "./buildJobApi"
+import { removeFiles } from "./util"
 
-const {
-  HTTP2_HEADER_PATH,
-  HTTP2_HEADER_STATUS,
-  HTTP_STATUS_OK,
-  HTTP_STATUS_INTERNAL_SERVER_ERROR,
-} = constants
+const nanoid = require("nanoid")
 
-let tmpFileCounter = 0
+class Task {
+  readonly cancellationToken = new CancellationToken()
 
-export function handleBuildRequest(stream: ServerHttp2Stream, headers: IncomingHttpHeaders, configuration: BuildServerConfiguration, buildQueue: Queue) {
-  const targets = headers["x-targets"]
-  const platform = headers["x-platform"] as string
-
-  function headerNotSpecified(name: string) {
-    stream.respond({[HTTP2_HEADER_STATUS]: constants.HTTP_STATUS_BAD_REQUEST})
-    stream.end(JSON.stringify({error: `Header ${name} is not specified`}))
+  constructor(readonly id: string) {
   }
-
-  if (targets == null) {
-    headerNotSpecified("x-targets")
-    return
-  }
-  if (platform == null) {
-    headerNotSpecified("x-platform")
-    return
-  }
-
-  const archiveName = `${(tmpFileCounter++).toString(16)}.zst`
-  doHandleBuildRequest(stream, {
-    archiveName,
-    platform,
-    targets: Array.isArray(targets) ? targets : [targets],
-    zstdCompression: parseInt((headers["x-zstd-compression-level"] as string | undefined) || "-1", 10)
-  }, buildQueue)
-    .catch(error => {
-      console.error(error)
-      stream.respond({[HTTP2_HEADER_STATUS]: HTTP_STATUS_INTERNAL_SERVER_ERROR}, {endStream: true})
-    })
 }
 
-async function doHandleBuildRequest(stream: ServerHttp2Stream, jobData: BuildTask, buildQueue: Queue) {
-  const fd = await open(getArchivePath(jobData.archiveName),  "wx")
+// 60 minutes (quite enough for user to download file)
+// const ORPHAN_DIR_TTL = 60 * 60 * 1000
+const ORPHAN_DIR_TTL = 20 * 1000
+// 1 minute
+// const ORPHAN_DIR_CHECK_TTL = 60 * 1000
+const ORPHAN_DIR_CHECK_TTL = 1000
 
-  // save to temp file
-  const errorHandler = (error: Error) => {
-    close(fd)
-      .catch(error => console.error(error))
-    console.error(error)
-    if (!stream.destroyed) {
-      stream.respond({[HTTP2_HEADER_STATUS]: HTTP_STATUS_INTERNAL_SERVER_ERROR}, {endStream: true})
+let requestIdCounter = 0
+
+export class BuildHandler {
+  // delete local dir after 30 minutes to ensure that even if something goes wrong will be no orphan files
+  private readonly createdIds = new Map<string, number>()
+  private lastOrphanCheck = 0
+
+  constructor(private readonly buildQueue: Queue, private readonly builderTmpDir: string) {
+  }
+
+  private checkOrphanDirs(createdIds: Map<string, number>) {
+    if (createdIds.size <= 0) {
+      return
     }
+
+    const now = Date.now()
+    if ((now - this.lastOrphanCheck) < ORPHAN_DIR_CHECK_TTL) {
+      return
+    }
+
+    const toDelete: Array<string> = []
+    for (const id of Array.from(createdIds.keys())) {
+      const createdAt = createdIds.get(id)!!
+      if ((now - createdAt) > ORPHAN_DIR_TTL) {
+        createdIds.delete(id)
+        toDelete.push(this.builderTmpDir + path.sep + id)
+      }
+    }
+    if (toDelete.length > 0) {
+      console.log(`Delete orphan files: ${toDelete.join(", ")}`)
+      removeFiles(toDelete)
+    }
+
+    this.lastOrphanCheck = now
   }
 
-  const fileStream = createWriteStream("", {
-    fd,
-    autoClose: false,
-  })
-  fileStream.on("error", errorHandler)
+  handleBuildRequest(response: ServerResponse, request: IncomingMessage) {
+    const createdIds = this.createdIds
+    this.checkOrphanDirs(createdIds)
 
-  if (process.env.KEEP_TMP_DIR_AFTER_BUILD == null) {
-    stream.once("streamClosed", () => {
-      // normally, archive file is already deleted, but -f flag is used for rm, so, it is ok
-      removeFiles([getBuildDir(jobData.archiveName), getArchivePath(jobData.archiveName)])
+    const headers = request.headers
+    const targets = headers["x-targets"]
+    const platform = headers["x-platform"] as string
+    let archiveFile = headers["x-file"] as string
+
+    // required for development (when node is not managed by docker and cannot access to docker volume)
+    const projectArchiveDir = process.env.PROJECT_ARCHIVE_DIR_PARENT
+    if (projectArchiveDir != null) {
+      archiveFile = projectArchiveDir + archiveFile
+    }
+
+    function headerNotSpecified(name: string) {
+      response.statusCode = 400
+      if (archiveFile != null) {
+        unlink(archiveFile)
+          .catch(error => {
+            console.error(`Cannot delete archiveFile on incorrect header: ${error}`)
+          })
+      }
+      response.end(JSON.stringify({error: `Header ${name} is not specified`}))
+    }
+
+    if (targets == null) {
+      headerNotSpecified("x-targets")
+      return
+    }
+    if (platform == null) {
+      headerNotSpecified("x-platform")
+      return
+    }
+
+    if (archiveFile == null) {
+      response.statusCode = 500
+      response.end(JSON.stringify({error: `Internal error: header x-file is not specified`}))
+      return
+    }
+
+    // UUID uses 128-bit, to be sure, we use 144-bit
+    // base64 is not safe for fs / query / path (also, we use this id for file name - avoid uppercase vs lowercase)
+    // counter makes id unique, random 4 bytes secure
+    const requestId = `${(requestIdCounter++).toString(36)}-${nanoid(8)}`
+    const task = new Task(requestId)
+    request.on("aborted", () => {
+      console.log(`Request ${requestId} aborted`)
+      task.cancellationToken.cancel()
     })
-  }
 
-  stream.on("error", errorHandler)
-  const uploadTimer = new Timer(`Upload`)
-  fileStream.on("finish", () => {
-    fileUploaded(fd, uploadTimer, stream, jobData, buildQueue, errorHandler)
-      .catch(errorHandler)
-  })
-  stream.pipe(fileStream)
+    createdIds.set(requestId, Date.now())
+
+    doHandleBuildRequest(response, {
+      archiveFile,
+      platform,
+      targets: Array.isArray(targets) ? targets : [targets],
+      zstdCompression: parseInt((headers["x-zstd-compression-level"] as string | undefined) || "-1", 10)
+    }, this.buildQueue, task)
+      .then(job => {
+        if (job == null) {
+          return
+        }
+
+        response.statusCode = 200
+        response.end(`{"id": "${requestId}"}`)
+
+        pushResult(task, job)
+          .catch(error => {
+            removeFiles([archiveFile])
+            console.error(`Unexpected error on pushResult: ${error.stack || error}`)
+          })
+      })
+      .catch(error => {
+        unlink(archiveFile)
+          .catch(error => {
+            console.error(`Cannot delete archiveFile on error: ${error}`)
+          })
+
+        console.error(error)
+        response.statusCode = 500
+        response.end()
+      })
+  }
 }
 
-async function fileUploaded(fd: number, uploadTimer: Timer, stream: ServerHttp2Stream, jobData: BuildTask, buildQueue: Queue, errorHandler: (error: Error) => void): Promise<void> {
-  let stats: Stats | null = null
+async function pushResult(task: Task, job: Job) {
+  const eventRequestOptions: RequestOptions = {
+    host: process.env.NGINX_ADDRESS || "nginx",
+    port: 8001,
+    method: "POST",
+    path: `/publish-build-event?id=${task.id}`
+  }
+
+  function publishEvent(data: string) {
+    const eventRequest = request(eventRequestOptions)
+    eventRequest.on("error", error => {
+      console.error(`Cannot publish event: ${error.stack || error}`)
+    })
+    eventRequest.write(data.length.toString(10))
+    eventRequest.write(data)
+    eventRequest.end()
+  }
+
+  // create channel, push_stream_authorized_channels_only is set to "on", so, channel must be created prior to client connect
+  publishEvent("job added")
+
+  let data: BuildTaskResult
   try {
-    stats = await fstat(fd)
+    data = await job.finished()
   }
-  catch (e) {
-    console.error(e)
-  }
-
-  // it is ok to include stat time into upload time, stat call time is negligible
-  jobData.archiveSize = stats === null ? -1 : stats.size
-  jobData.uploadTime = uploadTimer.end(`Upload (size: ${jobData.archiveSize})`)
-
-  if (stream.destroyed) {
-    console.log("Client stream destroyed unexpectedly, job not added to queue")
-    return
-  }
-
-  const job = await buildQueue.add(jobData)
-  if (stream.destroyed) {
-    console.log(`Client stream destroyed unexpectedly, discard job ${job.id}`)
-    job.discard()
-    return
-  }
-
-  let isBuilt = false
-  const streamClosedHandler = () => {
-    if (!isBuilt) {
-      job.discard()
-    }
-  }
-  stream.once("streamClosed", streamClosedHandler)
-
-  const data: BuildTaskResult = await job.finished()
-  isBuilt = true
-  stream.removeListener("streamClosed", streamClosedHandler)
-
-  if (stream.destroyed) {
-    console.log("Client stream destroyed unexpectedly, do not send artifacts")
+  catch (error) {
+    console.error(`Job ${job.id} error: ${error.stack || error}`)
+    publishEvent('{"error": "internal server error"}')
     return
   }
 
   if (data.error != null) {
-    stream.respond({[HTTP2_HEADER_STATUS]: HTTP_STATUS_OK})
-    stream.end(JSON.stringify(data))
+    publishEvent(JSON.stringify(data))
     return
   }
 
-  const artifacts = data.artifacts!!
-  const artifactNames: Array<string> = []
-  for (const artifact of artifacts) {
-    const file = artifact.file
-    const relativePath = file.substring(data.relativePathOffset!!)
-    artifactNames.push(relativePath)
-    // path must start with / otherwise stream will be not pushed
-    const headers: any = {
-      [HTTP2_HEADER_PATH]: relativePath,
-    }
-    if (artifact.target != null) {
-      headers["x-target"] = artifact.target
-    }
-    if (artifact.arch != null) {
-      headers["x-arch"] = artifact.arch
-    }
-    if (artifact.safeArtifactName != null) {
-      // noinspection SpellCheckingInspection
-      headers["x-safeartifactname"] = artifact.safeArtifactName
-    }
-    if (artifact.isWriteUpdateInfo) {
-      // noinspection SpellCheckingInspection
-      headers["x-iswriteupdateinfo"] = "1"
-    }
-    if (artifact.updateInfo != null) {
-      // noinspection SpellCheckingInspection
-      headers["x-updateinfo"] = JSON.stringify(artifact.updateInfo)
-    }
+  publishEvent(JSON.stringify({files: data.artifacts}))
+}
 
-    if (stream.destroyed) {
-      console.log("Client stream destroyed unexpectedly, do not send artifacts")
-      return
-    }
+async function doHandleBuildRequest(response: ServerResponse, jobData: BuildTask, buildQueue: Queue, task: Task): Promise<Job | null> {
+  const stats = await stat(jobData.archiveFile)
+  jobData.archiveSize = stats.size
 
-    stream.pushStream(headers, pushStream => {
-      pushStream.respondWithFile(file, undefined, {
-        onError: errorHandler,
-      })
-    })
+  if (task.cancellationToken.cancelled) {
+    console.log(`Task ${task.id} cancelled unexpectedly - not added to queue`)
+    return null
   }
 
-  stream.respond({":status": 200})
-  stream.end(JSON.stringify({files: artifactNames}))
+  const job = await buildQueue.add(jobData, {jobId: task.id})
+  if (task.cancellationToken.cancelled) {
+    console.log(`Task ${task.id} cancelled unexpectedly - job discarded`)
+    job.discard()
+    return null
+  }
+
+  return job
 }

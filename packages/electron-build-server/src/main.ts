@@ -1,19 +1,12 @@
 import * as Queue from "bull"
-import { emptyDir } from "fs-extra-p"
-import { constants, createSecureServer } from "http2"
+import { emptyDir, unlink } from "fs-extra-p"
+import { createServer } from "http"
 import * as redis from "ioredis"
 import * as os from "os"
 import * as path from "path"
 import { ServiceEntry, ServiceInfo, ServiceRegistry } from "service-registry-redis"
-import { handleBuildRequest } from "./buildHandler"
+import { BuildHandler } from "./buildHandler"
 import { prepareBuildTools } from "./download-required-tools"
-import { getSslOptions } from "./sslKeyAndCert"
-
-const {
-  HTTP2_HEADER_PATH,
-  HTTP2_HEADER_STATUS,
-  HTTP_STATUS_NOT_FOUND
-} = constants
 
 export interface BuildServerConfiguration {
   readonly queueName: string
@@ -40,13 +33,14 @@ async function main() {
     throw new Error(`Env REDIS_ENDPOINT must be set to Redis database endpoint. Free plan on https://redislabs.com is suitable.`)
   }
 
-  const port = process.env.ELECTRON_BUILD_SERVICE_PORT ? parseInt(process.env.ELECTRON_BUILD_SERVICE_PORT!!, 10) : 443
-  // if port < 1024 it means that we are in the docker container / special server for service, and so, no need to use path qualifier in the tmp dir
-  const isDockerOrServer = port < 1024
-  const stageDir = isDockerOrServer ? os.tmpdir() : path.join(os.tmpdir(), "electron-build-server")
-  process.env.STAGE_DIR = stageDir
-  if (process.env.ELECTRON_BUILDER_TMP_DIR == null) {
-    process.env.ELECTRON_BUILDER_TMP_DIR = os.tmpdir()
+  const port = process.env.ELECTRON_BUILD_SERVICE_PORT ? parseInt(process.env.ELECTRON_BUILD_SERVICE_PORT!!, 10) : 80
+  let builderTmpDir = process.env.ELECTRON_BUILDER_TMP_DIR
+  if (builderTmpDir == null) {
+    builderTmpDir = os.tmpdir() + path.sep + "builder-tmp"
+    process.env.ELECTRON_BUILDER_TMP_DIR = builderTmpDir
+  }
+  else if (builderTmpDir === os.tmpdir() || os.homedir().startsWith(builderTmpDir) || builderTmpDir === "/") {
+    throw new Error(`${builderTmpDir} cannot be used as ELECTRON_BUILDER_TMP_DIR because this dir will be emptied`)
   }
 
   const configuration: BuildServerConfiguration = {
@@ -77,26 +71,36 @@ async function main() {
   await Promise.all([
     cancelOldJobs(buildQueue),
     prepareBuildTools(),
-    isDockerOrServer ? Promise.resolve() : emptyDir(stageDir!),
+    emptyDir((process.env.PROJECT_ARCHIVE_DIR_PARENT || "") + "/uploaded-projects"),
+    emptyDir(builderTmpDir),
   ])
 
   const isSandboxed = process.env.SANDBOXED_BUILD_PROCESS !== "false"
   const concurrency = isSandboxed ? (os.cpus().length + 1) : 1
   const builderPath = path.join(__dirname, "builder.js")
   // noinspection JSIgnoredPromiseFromCall
-  buildQueue.process(concurrency, isSandboxed ? builderPath : require(builderPath).default)
+  buildQueue.process(concurrency, isSandboxed ? builderPath : require(builderPath))
 
-  const server = createSecureServer(await getSslOptions())
-  server.on("stream", (stream, headers) => {
-    const requestPath = headers[HTTP2_HEADER_PATH]
-    if (requestPath !== "/v1/build") {
-      stream.respond({ [HTTP2_HEADER_STATUS]: HTTP_STATUS_NOT_FOUND }, {endStream: true})
-      return
+  const buildHandler = new BuildHandler(buildQueue, builderTmpDir)
+  const server = createServer(((request, response) => {
+    const url = request.url
+    if (url === "/v1/upload") {
+      buildHandler.handleBuildRequest(response, request)
     }
-
-    handleBuildRequest(stream, headers, configuration, buildQueue)
-  })
-
+    else if (url != null && url.startsWith("/downloaded")) {
+      const localFile = builderTmpDir!! + request.headers["x-file"]
+      console.log(`Delete downloaded file: ${localFile}`)
+      unlink(localFile)
+        .catch(error => {
+          console.error(`Cannot delete file ${localFile}: ${error.stack || error}`)
+        })
+    }
+    else {
+      console.error(`Unsupported route: ${url}`)
+      response.statusCode = 404
+      response.end()
+    }
+  }))
   let serviceEntry: ServiceEntry | null = null
 
   // callback null if sync exit
@@ -140,8 +144,7 @@ async function main() {
 
   return new Promise((resolve, reject) => {
     server.on("error", reject)
-    // LISTEN_FDS - systemd socket
-    server.listen(process.env.LISTEN_FDS == null ? (port) : {fd: 3}, () => {
+    server.listen(port, () => {
       console.log(`Server listening on ${server.address().address}:${server.address().port}, concurrency: ${concurrency}, tmpfs: ${process.env.ELECTRON_BUILDER_TMP_DIR || "no"}, ${JSON.stringify(configuration, null, 2)}`)
 
       const serviceRegistry = new ServiceRegistry(redisClient)

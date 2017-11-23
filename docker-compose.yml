@@ -1,34 +1,18 @@
 version: '3.4'
+# intended to run on debian-like, where /dev/shm it is tmpfs
+# we cannot use docker tmpfs volume because we need to share data (build artifact) across containers (builder produces, nginx serves for client)
 services:
-  builder:
-    image: electronuserland/build-server
-    volumes:
-      - type: tmpfs
-        target: /tmp/ram
-        volume:
-          nocopy: true
-      - type: bind
-        source: projectData
-        target: /projectData
-        volume:
-          nocopy: true
-    environment:
-      - REDIS_ENDPOINT
-      - DEBUG
-
   nginx:
-    image: nginx:alpine
-    links:
-      - builder
+    image: develar/nginx-pushstream:latest
     ports:
-      - 8443:443
+      - target: 443
+        # https://github.com/moby/moby/issues/35532#issuecomment-346753307
+        published: 8443
+        # https://docs.docker.com/engine/swarm/ingress/#bypass-the-routing-mesh
+        mode: host
     volumes:
-      - type: bind
-        source: projectData
-        target: /projectData
-        volume:
-          nocopy: true
-      - ./certs:/certs:ro
-
-volumes:
-  projectData:
+      - ${CERTS_DIR:-./certs}:/certs:ro
+      - ${NGINX_CONF_DIR:-./nginx-conf}/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ${NGINX_CONF_DIR:-./nginx-conf}/builder-upstream.${NGINX_ENV:-dev}.conf:/etc/nginx/upstream.conf:ro
+      - ${DATA_ROOT_DIR:-/Volumes/test}/uploaded-projects:/uploaded-projects:delegated
+      - ${DATA_ROOT_DIR:-/Volumes/test}/builder-tmp:/builder-tmp:delegated

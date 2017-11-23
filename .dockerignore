@@ -10,3 +10,4 @@ test
 .terraform
 terraform.*
 **/.bin
+docker-compose.yml

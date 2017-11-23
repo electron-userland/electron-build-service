@@ -1,0 +1,35 @@
+#cloud-config
+
+# https://github.com/number5/cloud-init/blob/master/doc/examples/cloud-config.txt
+disable_root: true
+locale: C.UTF-8
+timezone: Etc/UTC
+
+rancher:
+  docker:
+    engine: docker-17.06.1-ce
+
+  network:
+    interfaces:
+      eth0:
+        dhcp: true
+
+# http://permissions-calculator.org
+write_files:
+  - path: /etc/ssh/sshd_config
+    permissions: "0600"
+    owner: root
+  - path: /etc/rc.local
+    permissions: "0700"
+    owner: root
+  - path: /opt/rancher/bin/start.sh
+    permissions: "0755"
+    owner: root
+  - path: /etc/app-certs/bundle.crt
+    permissions: "0600"
+    owner: root
+  - path: /etc/app-certs/node.key
+    permissions: "0600"
+    owner: root
+  - path: /etc/nginx-conf/nginx.conf
+  - path: /etc/docker-compose.stack.yml
