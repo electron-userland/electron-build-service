@@ -1,13 +1,10 @@
-version: '3.4'
+version: "3.4"
 services:
   nginx:
     image: develar/nginx-pushstream:latest
     ports:
       - target: 443
-        # https://github.com/moby/moby/issues/35532#issuecomment-346753307
+        # will be replaced to 443 for production by script due to https://github.com/moby/moby/issues/35532#issuecomment-346753307
         published: 8443
         # https://docs.docker.com/engine/swarm/ingress/#bypass-the-routing-mesh
         mode: host
-    volumes:
-      - ${DATA_ROOT_DIR:-/Volumes/test}/uploaded-projects:/uploaded-projects:delegated
-      - ${DATA_ROOT_DIR:-/Volumes/test}/builder-tmp:/builder-tmp:delegated

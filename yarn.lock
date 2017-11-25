@@ -339,9 +339,9 @@ ejs@^2.5.7:
   version "2.5.7"
   resolved "https://registry.yarnpkg.com/ejs/-/ejs-2.5.7.tgz#cc872c168880ae3c7189762fd5ffc00896c9518a"
 
-electron-builder-lib@19.46.5:
-  version "19.46.5"
-  resolved "https://registry.yarnpkg.com/electron-builder-lib/-/electron-builder-lib-19.46.5.tgz#04267693ede833364b0fe2bfb2195aa6c625eae9"
+electron-builder-lib@19.46.9:
+  version "19.46.9"
+  resolved "https://registry.yarnpkg.com/electron-builder-lib/-/electron-builder-lib-19.46.9.tgz#c9ae265dfaee0fd4182b2d095b1cedbbfca4913e"
   dependencies:
     "7zip-bin" "^2.2.7"
     app-package-builder "1.5.2"

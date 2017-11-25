@@ -6,11 +6,8 @@ import * as os from "os"
 import * as path from "path"
 import { createRedisClient, createServiceInfo, ServiceEntry, ServiceRegistry } from "service-registry-redis"
 import { BuildHandler } from "./buildHandler"
+import { getStageDir } from "./buildJobApi"
 import { prepareBuildTools } from "./download-required-tools"
-
-export interface BuildServerConfiguration {
-  readonly queueName: string
-}
 
 // clean queue (wait and delayed jobs) on restart since in any case client task is cancelled on abort
 async function cancelOldJobs(queue: any) {
@@ -27,7 +24,16 @@ async function cancelOldJobs(queue: any) {
   console.log(`Discarded jobs: waiting ${waitingJobs.length}, delayed: ${delayedJobs.length}`)
 }
 
-async function main() {
+function getQueueName() {
+  let name = os.hostname()
+  const prefix = "bs-"
+  if (name.startsWith(prefix)) {
+    name = name.substring(prefix.length)
+  }
+  return `build-${name}`
+}
+
+function setupBuilderTmpDir() {
   let builderTmpDir = process.env.ELECTRON_BUILDER_TMP_DIR
   if (builderTmpDir == null) {
     builderTmpDir = os.tmpdir() + path.sep + "builder-tmp"
@@ -36,14 +42,15 @@ async function main() {
   else if (builderTmpDir === os.tmpdir() || os.homedir().startsWith(builderTmpDir) || builderTmpDir === "/") {
     throw new Error(`${builderTmpDir} cannot be used as ELECTRON_BUILDER_TMP_DIR because this dir will be emptied`)
   }
+  return builderTmpDir
+}
 
-  const configuration: BuildServerConfiguration = {
-    queueName: `build-${os.hostname()}`
-  }
-
+async function main() {
+  const builderTmpDir = setupBuilderTmpDir()
   const redisClient = createRedisClient()
   let subscriber: redis.Redis | null = null
-  const buildQueue = new Queue(configuration.queueName, {
+  const queueName = getQueueName()
+  const buildQueue = new Queue(queueName, {
     createClient: type => {
       switch (type) {
         case "client":
@@ -62,10 +69,11 @@ async function main() {
     console.error(error)
   })
 
+  const stageDir = getStageDir()
   await Promise.all([
     cancelOldJobs(buildQueue),
     prepareBuildTools(),
-    emptyDir((process.env.PROJECT_ARCHIVE_DIR_PARENT || "") + "/uploaded-projects"),
+    emptyDir(stageDir),
     emptyDir(builderTmpDir),
   ])
 
@@ -82,7 +90,7 @@ async function main() {
       buildHandler.handleBuildRequest(response, request)
     }
     else if (url != null && url.startsWith("/downloaded")) {
-      const localFile = builderTmpDir!! + request.headers["x-file"]
+      const localFile = stageDir + request.headers["x-file"]
       console.log(`Delete downloaded file: ${localFile}`)
       unlink(localFile)
         .catch(error => {
@@ -140,7 +148,7 @@ async function main() {
     server.on("error", reject)
     const port = process.env.ELECTRON_BUILD_SERVICE_PORT ? parseInt(process.env.ELECTRON_BUILD_SERVICE_PORT!!, 10) : 80
     server.listen(port, () => {
-      console.log(`Server listening on ${server.address().address}:${server.address().port}, concurrency: ${concurrency}, tmpfs: ${process.env.ELECTRON_BUILDER_TMP_DIR || "no"}, ${JSON.stringify(configuration, null, 2)}`)
+      console.log(`Server listening on ${server.address().address}:${server.address().port}, concurrency: ${concurrency}, temp dir: ${process.env.ELECTRON_BUILDER_TMP_DIR || "no"}, queueName: ${queueName}`)
       resolve()
     })
   })

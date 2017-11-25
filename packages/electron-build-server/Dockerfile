@@ -47,7 +47,6 @@ WORKDIR /app
 
 COPY --from=builder /app .
 
-VOLUME /app/certs
-EXPOSE 443
+EXPOSE 80
 
 CMD [ "node", "/app/out/main.js" ]

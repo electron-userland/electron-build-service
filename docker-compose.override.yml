@@ -1,7 +1,7 @@
-version: '3.4'
+version: "3.4"
 services:
   nginx:
-    command: [nginx-debug, '-g', 'daemon off;']
+    command: [nginx-debug, "-g", "daemon off;"]
     ports:
       # dev nodejs (outside of docker network) should be able to connect to nginx (publish events)
       - 8001:8001
@@ -9,3 +9,4 @@ services:
       - ./certs:/run/secrets:ro
       - ./nginx-conf/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx-conf/upstream.${NGINX_ENV:-dev}.conf:/etc/nginx/upstream.conf:ro
+      - ${DATA_ROOT_DIR:-/Volumes/test}/stage:/stage:delegated

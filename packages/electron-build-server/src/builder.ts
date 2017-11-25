@@ -1,13 +1,15 @@
 import { exec } from "builder-util"
 import { Job } from "bull"
-import { Packager, PackagerOptions, PublishOptions } from "electron-builder-lib"
+import { Arch, Packager, PackagerOptions, PublishOptions } from "electron-builder-lib"
 import { emptyDir, ensureDir, readJson, unlink } from "fs-extra-p"
 import * as path from "path"
-import { ArtifactInfo, BuildTask, BuildTaskResult, getBuildDir } from "./buildJobApi"
+import { ArtifactInfo, BuildTask, BuildTaskResult, getBuildDir, getStageDir } from "./buildJobApi"
 import { removeFiles, Timer } from "./util"
 
 process.env.ORIGINAL_ELECTRON_BUILDER_TMP_DIR = process.env.ELECTRON_BUILDER_TMP_DIR
-process.env.ELECTRON_BUILDER_REMOVE_STAGE_EVEN_IF_DEBUG = "true"
+if (process.env.ELECTRON_BUILDER_REMOVE_STAGE_EVEN_IF_DEBUG == null) {
+  process.env.ELECTRON_BUILDER_REMOVE_STAGE_EVEN_IF_DEBUG = "true"
+}
 
 export default async function processor(job: Job): Promise<BuildTaskResult> {
   const data: BuildTask = job.data
@@ -20,7 +22,8 @@ export default async function processor(job: Job): Promise<BuildTaskResult> {
     throw new Error("Env ELECTRON_BUILDER_TMP_DIR must be set for builder process")
   }
 
-  const projectDir = getBuildDir(job.id as string)
+  const requestId = job.id as string
+  const projectDir = getBuildDir(requestId)
   await emptyDir(projectDir)
 
   // env can be changed globally because worker is sandboxed (separate process)
@@ -56,21 +59,20 @@ export default async function processor(job: Job): Promise<BuildTaskResult> {
   // remove archive, not needed anymore
   const info = (await Promise.all([unlink(archiveFile), readJson(infoFile)]))[1]
 
-  const prepackaged = path.join(projectDir, "linux-unpacked")
+  const projectOutDir = getStageDir() + path.sep + requestId
+  // yes, for now we expect the only target
+  const prepackaged = projectDir + path.sep + targets[0].unpackedDirName
   // do not use build function because we don't need to publish artifacts
   const options: PackagerOptions & PublishOptions = {
     prepackaged,
     projectDir,
-    [data.platform]: targets,
+    [data.platform]: targets.map(it => it.name + ":" + it.arch),
     publish: "never",
-    config: {
-      publish: null,
-    },
   }
   const packager = new Packager(options)
 
   const artifacts: Array<ArtifactInfo> = []
-  const relativePathOffset = projectDir.length + "dist".length + 2
+  const relativePathOffset = projectOutDir.length + 1
   packager.artifactCreated(event => {
     if (event.file != null) {
       artifacts.push({
@@ -84,13 +86,34 @@ export default async function processor(job: Job): Promise<BuildTaskResult> {
     }
   })
 
+  const dirToEarlyCleanup: Array<string> = [prepackaged, projectTempDir, infoFile]
+
   function cleanup() {
+    if (process.env.ELECTRON_BUILDER_REMOVE_STAGE_EVEN_IF_DEBUG === "false") {
+      return
+    }
+
     // cleanup early because prepackaged files can be on a RAM disk
-    removeFiles([prepackaged, projectTempDir, infoFile])
+    removeFiles(dirToEarlyCleanup)
   }
 
   try {
-    await packager._build(info.configuration, info.metadata, info.devMetadata, info.repositoryInfo)
+    packager.stageDirPathCustomizer = (target, packager, arch) => {
+      // snap creates a lot of files and so, we cannot use tmpfs to avoid out of memory error
+      const parentDir = target.name === "snap" ? projectOutDir : projectDir
+      const result = parentDir + path.sep + `__${target.name}-${Arch[arch]}`
+      dirToEarlyCleanup.push(result)
+      return result
+    }
+
+    // _build method expects final effective configuration - packager.options.config is ignored
+    await packager._build({
+      ...info.configuration,
+      publish: null,
+      directories: {
+        output: projectOutDir,
+      },
+    }, info.metadata, info.devMetadata, info.repositoryInfo)
     cleanup()
 
     return {

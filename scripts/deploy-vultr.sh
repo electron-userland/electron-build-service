@@ -9,6 +9,7 @@ set -e
 
 # 9 Frankfurt
 # 24 Paris
+# 7 Amsterdam
 # OS 159 custom (to use startup script)
 # OS 179 CoreOS
 
@@ -16,4 +17,6 @@ set -e
 #vultr server create --name=electron-builder-service --hostname=electron-builder-service-green --region=9 --plan=201 --os=159 --script=223441 --user-data=scripts/private/cloud-config.yml --ipv6=true --notify-activate=false
 vultr server create --name=electron-builder-service --hostname=electron-builder-service-green --region=24 --plan=201 --os=159 --script=224121 --ipv6=true --notify-activate=false
 vultr server create --name=electron-builder-service --hostname=electron-builder-service-green --region=24 --plan=201 --os=159 --script=226069 --ipv6=true --notify-activate=false
-vultr server create --name=electron-builder-service --hostname=electron-builder-service-blue --region=24 --plan=201 --os=179 --script=226072 --user-data=scripts/private/cloud-config.yml --ipv6=true --notify-activate=false
+
+# Amsterdam
+vultr server create --name=bs-ams1-blue --hostname=bs-ams1-blue --region=7 --plan=201 --os=179 --script=226072 --user-data=scripts/private/cloud-config.yml --ipv6=true --notify-activate=false

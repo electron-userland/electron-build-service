@@ -11,6 +11,7 @@ export function createRedisClient() {
   if (redisEndpoint == null || redisEndpoint.length === 0) {
     throw new Error(`Env REDIS_ENDPOINT must be set to Redis database endpoint. Free plan on https://redislabs.com is suitable.`)
   }
+  console.log(`Redis endpoint (last 3 symbols): ${redisEndpoint.substring(redisEndpoint.length - 3)}`)
   return redis(redisEndpoint.startsWith("redis://") ? redisEndpoint : `redis://${redisEndpoint}`)
 }
 

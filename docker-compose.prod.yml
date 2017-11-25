@@ -1,9 +1,7 @@
-version: '3.4'
-# intended to run on CoreOS, where /tmp it is tmpfs
-# we cannot use docker tmpfs volume because we need to share data (build artifact) across containers (builder produces, nginx serves for client)
+version: "3.4"
 services:
   builder:
-    hostname: "{{.Node.ID}}-{{.Service.Name}}"
+    hostname: "{{.Node.Hostname}}-{{.Service.Name}}-${ENV_COLOR}"
     image: electronuserland/build-server
     deploy: &DEPLOY
       # on each node labeled "builder"
@@ -12,23 +10,28 @@ services:
       placement:
         constraints:
           - node.labels.builder == true
+          - node.labels.environment == ${ENV_COLOR}
       restart_policy:
         condition: on-failure
         max_attempts: 10
 
     volumes:
-      - ${DATA_ROOT_DIR}/uploaded-projects:/uploaded-projects
-      - ${DATA_ROOT_DIR}/builder-tmp:/builder-tmp
+      - type: volume
+        source: stage
+        target: /stage
+      - type: tmpfs
+        target: /builder-tmp
     environment:
       - REDIS_ENDPOINT
       - DEBUG
       - ELECTRON_BUILDER_TMP_DIR=/builder-tmp
+      - ENVIRONMENT=${ENV_COLOR}
     # about logging - https://jaxenter.com/docker-logging-gotchas-137049.html Well, docker supports journald and so, we just configure papertrail for journald.
     logging: &LOGGING
-      driver: journald
+      driver: ${LOGGING_DRIVER:-journald}
 
   nginx:
-    hostname: "{{.Node.ID}}-{{.Service.Name}}"
+    hostname: "{{.Node.Hostname}}-{{.Service.Name}}-${ENV_COLOR}"
     secrets:
       - source: builder.crt.v1
         target: bundle.crt
@@ -39,10 +42,15 @@ services:
         target: /etc/nginx/nginx.conf
       - source: nginx-upstream.conf.v1
         target: /etc/nginx/upstream.conf
+    volumes:
+      - stage:/stage
     deploy:
       <<: *DEPLOY
     logging:
       <<: *LOGGING
+
+volumes:
+  stage:
 
 secrets:
   builder.crt.v1:

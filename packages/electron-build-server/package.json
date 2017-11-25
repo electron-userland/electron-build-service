@@ -9,7 +9,7 @@
     "async-exit-hook": "^2.0.1",
     "builder-util": "^3.4.2",
     "bull": "^3.3.6",
-    "electron-builder-lib": "19.46.5",
+    "electron-builder-lib": "19.46.9",
     "fs-extra-p": "^4.4.4",
     "service-registry-redis": "0.0.1",
     "ioredis": "^3.2.1",

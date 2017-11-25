@@ -3,7 +3,7 @@ import { CancellationToken } from "electron-builder-lib"
 import { stat, unlink } from "fs-extra-p"
 import { IncomingMessage, request, RequestOptions, ServerResponse } from "http"
 import * as path from "path"
-import { BuildTask, BuildTaskResult } from "./buildJobApi"
+import { BuildTask, BuildTaskResult, TargetInfo } from "./buildJobApi"
 import { removeFiles } from "./util"
 
 const nanoid = require("nanoid")
@@ -63,7 +63,7 @@ export class BuildHandler {
     this.checkOrphanDirs(createdIds)
 
     const headers = request.headers
-    const targets = headers["x-targets"]
+    const rawTargets = headers["x-targets"]
     const platform = headers["x-platform"] as string
     let archiveFile = headers["x-file"] as string
 
@@ -73,7 +73,7 @@ export class BuildHandler {
       archiveFile = projectArchiveDir + archiveFile
     }
 
-    function headerNotSpecified(name: string) {
+    function headerNotSpecified(name: string, message: string = "is not specified") {
       response.statusCode = 400
       if (archiveFile != null) {
         unlink(archiveFile)
@@ -81,13 +81,23 @@ export class BuildHandler {
             console.error(`Cannot delete archiveFile on incorrect header: ${error}`)
           })
       }
-      response.end(JSON.stringify({error: `Header ${name} is not specified`}))
+      response.end(JSON.stringify({error: `Header ${name} ${message}`}))
     }
 
-    if (targets == null) {
+    if (rawTargets == null) {
       headerNotSpecified("x-targets")
       return
     }
+
+    let targets: Array<TargetInfo>
+    try {
+      targets = JSON.parse(rawTargets as string)
+    }
+    catch (e) {
+      headerNotSpecified(e, "is incorrect, valid JSON is expected: " + e.message)
+      return
+    }
+
     if (platform == null) {
       headerNotSpecified("x-platform")
       return
@@ -116,7 +126,7 @@ export class BuildHandler {
     addJob(response, {
       archiveFile,
       platform,
-      targets: Array.isArray(targets) ? targets : [targets],
+      targets,
       zstdCompression: parseInt((headers["x-zstd-compression-level"] as string | undefined) || "-1", 10)
     }, this.buildQueue, task)
       .then(job => {
