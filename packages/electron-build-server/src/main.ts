@@ -4,7 +4,7 @@ import { createServer } from "http"
 import * as redis from "ioredis"
 import * as os from "os"
 import * as path from "path"
-import { ServiceEntry, ServiceInfo, ServiceRegistry } from "service-registry-redis"
+import { createRedisClient, createServiceInfo, ServiceEntry, ServiceRegistry } from "service-registry-redis"
 import { BuildHandler } from "./buildHandler"
 import { prepareBuildTools } from "./download-required-tools"
 
@@ -28,12 +28,6 @@ async function cancelOldJobs(queue: any) {
 }
 
 async function main() {
-  const redisEndpoint = process.env.REDIS_ENDPOINT
-  if (redisEndpoint == null || redisEndpoint.length === 0) {
-    throw new Error(`Env REDIS_ENDPOINT must be set to Redis database endpoint. Free plan on https://redislabs.com is suitable.`)
-  }
-
-  const port = process.env.ELECTRON_BUILD_SERVICE_PORT ? parseInt(process.env.ELECTRON_BUILD_SERVICE_PORT!!, 10) : 80
   let builderTmpDir = process.env.ELECTRON_BUILDER_TMP_DIR
   if (builderTmpDir == null) {
     builderTmpDir = os.tmpdir() + path.sep + "builder-tmp"
@@ -47,7 +41,7 @@ async function main() {
     queueName: `build-${os.hostname()}`
   }
 
-  const redisClient = redis(redisEndpoint.startsWith("redis://") ? redisEndpoint : `redis://${redisEndpoint}`)
+  const redisClient = createRedisClient()
   let subscriber: redis.Redis | null = null
   const buildQueue = new Queue(configuration.queueName, {
     createClient: type => {
@@ -119,7 +113,7 @@ async function main() {
     if (serviceEntry != null) {
       serviceEntry.leave()
         .catch(error => {
-          console.warn(`Build queue closed (with error: ${error.stack || error})`)
+          console.warn(`Service unregistered (with error: ${error.stack || error})`)
         })
     }
 
@@ -142,20 +136,19 @@ async function main() {
       })
   })
 
-  return new Promise((resolve, reject) => {
+  await new Promise((resolve, reject) => {
     server.on("error", reject)
+    const port = process.env.ELECTRON_BUILD_SERVICE_PORT ? parseInt(process.env.ELECTRON_BUILD_SERVICE_PORT!!, 10) : 80
     server.listen(port, () => {
       console.log(`Server listening on ${server.address().address}:${server.address().port}, concurrency: ${concurrency}, tmpfs: ${process.env.ELECTRON_BUILDER_TMP_DIR || "no"}, ${JSON.stringify(configuration, null, 2)}`)
-
-      const serviceRegistry = new ServiceRegistry(redisClient)
-      serviceRegistry.join(new ServiceInfo("builder", "443"))
-        .then(it => {
-          serviceEntry = it
-          resolve()
-        })
-        .catch(reject)
+      resolve()
     })
   })
+
+  const serviceRegistry = new ServiceRegistry(redisClient)
+  const serviceInfo = await createServiceInfo("builder", "443")
+  console.log(JSON.stringify(serviceInfo, null, 2))
+  serviceEntry = await serviceRegistry.join(serviceInfo)
 }
 
 main()

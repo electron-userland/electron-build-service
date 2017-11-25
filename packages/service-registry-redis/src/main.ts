@@ -1,18 +1,44 @@
 import * as redis from "ioredis"
+import * as needle from "needle"
 import * as os from "os"
-import { Error } from "tslint/lib/error"
+import { promisify } from "util"
 import Timer = NodeJS.Timer
 
 // we use ioredis instead of node-redis because bull uses ioredis and we need to reuse connection
 
-const address = require("network-address")
+export function createRedisClient() {
+  const redisEndpoint = process.env.REDIS_ENDPOINT
+  if (redisEndpoint == null || redisEndpoint.length === 0) {
+    throw new Error(`Env REDIS_ENDPOINT must be set to Redis database endpoint. Free plan on https://redislabs.com is suitable.`)
+  }
+  return redis(redisEndpoint.startsWith("redis://") ? redisEndpoint : `redis://${redisEndpoint}`)
+}
+
+export async function createServiceInfo(name: string, port: string) {
+  const setTimeoutPromise = promisify(setTimeout)
+  let data: any = null
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      data = (await needle("get", "https://ipapi.co/json/")).body
+      break
+    }
+    catch (e) {
+      console.error(`Cannot get IP info: ${e.stack || e}`)
+      if (attempt === 2) {
+        throw e
+      }
+
+      await setTimeoutPromise(1000 * attempt, "wait")
+    }
+  }
+
+  return new ServiceInfo(name, data.ip, port, data.latitude, data.longitude)
+}
 
 export class ServiceInfo {
   readonly hostname: string = os.hostname()
-  readonly ipv4: string = address.ipv4()
-  readonly ipv6: string = address.ipv6()
 
-  constructor(readonly name: string, readonly port: string) {
+  constructor(readonly name: string, readonly ip: string, readonly port: string, readonly latitude: number, readonly longitude: number) {
   }
 }
 
@@ -133,12 +159,12 @@ export class ServiceRegistry {
   }
 
   join(serviceInfo: ServiceInfo): Promise<ServiceEntry> {
-    const key = `${KEY_PREFIX}${serviceInfo.name}/${serviceInfo.ipv4}/${serviceInfo.port}`
+    const key = `${KEY_PREFIX}${serviceInfo.name}/${serviceInfo.ip}/${serviceInfo.port}`
     const value = JSON.stringify(serviceInfo)
     const entry = new ServiceEntry(serviceInfo, key, this)
     return this.store.multi()
       .setex(key, this.expire, value)
-      .publish(ServiceChannels.JOIN, JSON.stringify(serviceInfo))
+      .publish(ServiceChannels.JOIN, value)
       .exec()
       .then(() => {
         this.scheduleUpdateServiceEntryTtl(entry)
@@ -154,72 +180,4 @@ export class ServiceRegistry {
       .publish(ServiceChannels.LEAVE, serviceEntry.key)
       .exec()
   }
-
-  // private _leave(list: Array<Entry>, cb) {
-  //   const loop = () => {
-  //     const next = list.shift()
-  //     if (next == null) {
-  //       return cb()
-  //     }
-  //
-  //     clearTimeout(next.timeoutHandle)
-  //     next.destroyed = true
-  //
-  //     const index = this.services.indexOf(next)
-  //     if (index > -1) {
-  //       this.services.splice(index, 1)
-  //     }
-  //     this.store.del(next.key, loop)
-  //   }
-  //
-  //   loop()
-  // }
-
-  // lookup(name: string, cb) {
-  //   this.list(name, (err, list) => {
-  //     if (err) {
-  //       return cb(err)
-  //     }
-  //     if (!list.length) {
-  //       return cb(null, null)
-  //     }
-  //     cb(null, list[(Math.random() * list.length) | 0])
-  //   })
-  // }
-
-  // list(name: string, cb) {
-  //   return new Promise((resolve, reject) => {
-  //     this.store.keys(`${prefix(name || "")}*`, (err, reply) => {
-  //       if (err) {
-  //         return cb(err)
-  //       }
-  //
-  //       if (reply == null || reply.length === 0) {
-  //         return cb(null, [])
-  //       }
-  //
-  //       this.store.mget(reply, (err, replies) => {
-  //         if (err) {
-  //           return cb(err)
-  //         }
-  //         if (!replies || replies.length === 0) {
-  //           return cb(null, [])
-  //         }
-  //
-  //         const list = replies
-  //           .map(node => {
-  //             try {
-  //               return JSON.parse(node)
-  //             }
-  //             catch (err) {
-  //               return null
-  //             }
-  //           })
-  //           .filter(val => val)
-  //
-  //         cb(null, list)
-  //       })
-  //     })
-  //   })
-  // }
 }

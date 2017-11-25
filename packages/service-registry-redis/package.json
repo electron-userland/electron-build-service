@@ -6,8 +6,12 @@
   "files": ["out"],
   "license": "MIT",
   "dependencies": {
-    "network-address": "^1.1.2",
-    "ioredis": "^3.2.1"
+    "async-exit-hook": "^2.0.1",
+    "ioredis": "^3.2.1",
+    "needle": "^2.0.1"
+  },
+  "devDependencies": {
+    "@types/needle": "^2.0.2"
   },
   "typings": "./out/main.d.ts"
 }

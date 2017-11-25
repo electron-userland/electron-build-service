@@ -2,7 +2,7 @@
   "private": true,
   "license": "MIT",
   "scripts": {
-    "compile": "tsc -p packages/service-registry-redis && tsc -p packages/electron-build-server",
+    "compile": "tsc -p packages/service-registry-redis && tsc -p packages/electron-build-server && tsc -p packages/router",
     "////": "verdaccio",
     "//": "REDIS_ENDPOINT and ELECTRON_BUILD_SERVICE_PORT (443 by default, so, on a local machine set to 8443) envs are required",
     "start": "yarn compile && node out/main.js",

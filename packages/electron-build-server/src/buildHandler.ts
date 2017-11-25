@@ -16,11 +16,11 @@ class Task {
 }
 
 // 60 minutes (quite enough for user to download file)
-// const ORPHAN_DIR_TTL = 60 * 60 * 1000
-const ORPHAN_DIR_TTL = 20 * 1000
+const ORPHAN_DIR_TTL = 60 * 60 * 1000
+// const ORPHAN_DIR_TTL = 20 * 1000
 // 1 minute
-// const ORPHAN_DIR_CHECK_TTL = 60 * 1000
-const ORPHAN_DIR_CHECK_TTL = 1000
+const ORPHAN_DIR_CHECK_TTL = 60 * 1000
+// const ORPHAN_DIR_CHECK_TTL = 1000
 
 let requestIdCounter = 0
 
@@ -94,15 +94,17 @@ export class BuildHandler {
     }
 
     if (archiveFile == null) {
+      const message = `Internal error: header x-file is not specified`
+      console.error(message)
       response.statusCode = 500
-      response.end(JSON.stringify({error: `Internal error: header x-file is not specified`}))
+      response.end(JSON.stringify({error: message}))
       return
     }
 
     // UUID uses 128-bit, to be sure, we use 144-bit
     // base64 is not safe for fs / query / path (also, we use this id for file name - avoid uppercase vs lowercase)
-    // counter makes id unique, random 4 bytes secure
-    const requestId = `${(requestIdCounter++).toString(36)}-${nanoid(8)}`
+    // counter makes id unique, random 8 bytes secure
+    const requestId = `${(requestIdCounter++).toString(36)}-${nanoid(6)}`
     const task = new Task(requestId)
     request.on("aborted", () => {
       console.log(`Request ${requestId} aborted`)
@@ -111,7 +113,7 @@ export class BuildHandler {
 
     createdIds.set(requestId, Date.now())
 
-    doHandleBuildRequest(response, {
+    addJob(response, {
       archiveFile,
       platform,
       targets: Array.isArray(targets) ? targets : [targets],
@@ -142,6 +144,26 @@ export class BuildHandler {
         response.end()
       })
   }
+}
+
+async function addJob(response: ServerResponse, jobData: BuildTask, buildQueue: Queue, task: Task): Promise<Job | null> {
+  const stats = await stat(jobData.archiveFile)
+  jobData.archiveSize = stats.size
+
+  if (task.cancellationToken.cancelled) {
+    console.log(`Task ${task.id} cancelled unexpectedly - not added to queue`)
+    return null
+  }
+
+  // in any case we need to pass requestId to builder (used as name of the build dir), so, instead of additional field, just use job id
+  const job = await buildQueue.add(jobData, {jobId: task.id})
+  if (task.cancellationToken.cancelled) {
+    console.log(`Task ${task.id} cancelled unexpectedly - job discarded`)
+    job.discard()
+    return null
+  }
+
+  return job
 }
 
 async function pushResult(task: Task, job: Job) {
@@ -181,23 +203,4 @@ async function pushResult(task: Task, job: Job) {
   }
 
   publishEvent(JSON.stringify({files: data.artifacts}))
-}
-
-async function doHandleBuildRequest(response: ServerResponse, jobData: BuildTask, buildQueue: Queue, task: Task): Promise<Job | null> {
-  const stats = await stat(jobData.archiveFile)
-  jobData.archiveSize = stats.size
-
-  if (task.cancellationToken.cancelled) {
-    console.log(`Task ${task.id} cancelled unexpectedly - not added to queue`)
-    return null
-  }
-
-  const job = await buildQueue.add(jobData, {jobId: task.id})
-  if (task.cancellationToken.cancelled) {
-    console.log(`Task ${task.id} cancelled unexpectedly - job discarded`)
-    job.discard()
-    return null
-  }
-
-  return job
 }

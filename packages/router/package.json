@@ -1,0 +1,13 @@
+{
+  "name": "router",
+  "version": "0.0.1",
+  "description": "service router",
+  "main": "out/router.js",
+  "files": ["out"],
+  "license": "MIT",
+  "dependencies": {
+    "ioredis": "^3.2.1",
+    "service-registry-redis": "0.0.1"
+  },
+  "typings": "./out/router.d.ts"
+}
