@@ -8,6 +8,12 @@ set -e
 # to see region ids: vultr regions
 
 # 9 Frankfurt
+# 24 Paris
 # OS 159 custom (to use startup script)
+# OS 179 CoreOS
+
+# 224121 - CoreOS
 #vultr server create --name=electron-builder-service --hostname=electron-builder-service-green --region=9 --plan=201 --os=159 --script=223441 --user-data=scripts/private/cloud-config.yml --ipv6=true --notify-activate=false
-vultr server create --name=electron-builder-service --hostname=electron-builder-service-green --region=9 --plan=201 --os=179 --user-data=/Users/develar/Documents/electron-build-service/kontena-cloud.config.yml --ipv6=true --notify-activate=false
+vultr server create --name=electron-builder-service --hostname=electron-builder-service-green --region=24 --plan=201 --os=159 --script=224121 --ipv6=true --notify-activate=false
+vultr server create --name=electron-builder-service --hostname=electron-builder-service-green --region=24 --plan=201 --os=159 --script=226069 --ipv6=true --notify-activate=false
+vultr server create --name=electron-builder-service --hostname=electron-builder-service-blue --region=24 --plan=201 --os=179 --script=226072 --user-data=scripts/private/cloud-config.yml --ipv6=true --notify-activate=false

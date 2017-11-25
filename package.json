@@ -7,12 +7,12 @@
     "//": "REDIS_ENDPOINT and ELECTRON_BUILD_SERVICE_PORT (443 by default, so, on a local machine set to 8443) envs are required",
     "start": "yarn compile && node out/main.js",
     "build": "docker build -t electronuserland/build-server -f packages/electron-build-server/Dockerfile . ",
+    "bundle": "./scripts/private/build-bundle.sh",
     "push": "docker push electronuserland/build-server",
     "start-docker": "docker run --mount type=tmpfs,destination=/tmp/ram -e ELECTRON_BUILDER_TMP_DIR=/tmp/ram -e REDIS_ENDPOINT -e DEBUG -p 8443:443 --rm electronuserland/build-server",
     "///": "https://github.com/hashicorp/packer/issues/4587#issuecomment-282916068",
     "image": "./scripts/private/build-do-image.sh",
-    "up": "docker-compose up --abort-on-container-exit",
-    "cloud-config": "node scripts/cloud-config-builder.js"
+    "up": "docker-compose up --abort-on-container-exit"
   },
   "workspaces": [
     "packages/*"

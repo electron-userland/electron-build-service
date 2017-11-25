@@ -1,6 +1,4 @@
 version: '3.4'
-# intended to run on debian-like, where /dev/shm it is tmpfs
-# we cannot use docker tmpfs volume because we need to share data (build artifact) across containers (builder produces, nginx serves for client)
 services:
   nginx:
     image: develar/nginx-pushstream:latest
@@ -11,8 +9,5 @@ services:
         # https://docs.docker.com/engine/swarm/ingress/#bypass-the-routing-mesh
         mode: host
     volumes:
-      - ${CERTS_DIR:-./certs}:/certs:ro
-      - ${NGINX_CONF_DIR:-./nginx-conf}/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ${NGINX_CONF_DIR:-./nginx-conf}/builder-upstream.${NGINX_ENV:-dev}.conf:/etc/nginx/upstream.conf:ro
       - ${DATA_ROOT_DIR:-/Volumes/test}/uploaded-projects:/uploaded-projects:delegated
       - ${DATA_ROOT_DIR:-/Volumes/test}/builder-tmp:/builder-tmp:delegated
