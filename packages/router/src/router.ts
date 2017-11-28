@@ -1,14 +1,20 @@
 import { createServer, IncomingMessage, ServerResponse } from "http"
-import { createRedisClient, ServiceCatalog } from "service-registry-redis"
+import { createRedisClient, ServiceInfo } from "service-registry-redis"
+import { ServiceCatalog } from "service-registry-redis/out/ServiceCatalog"
 
 async function main() {
   const redisClient = createRedisClient()
   const catalog = new ServiceCatalog(redisClient)
+  await catalog.listen()
 
   const server = createServer(((request, response) => {
     const url = request.url
     if (url === "/" || url == null || url.length === 0 || url.startsWith("/find-build-agent")) {
       handleRequest(response, request, catalog)
+        .then(result => {
+          response.statusCode = 200
+          response.end(result)
+        })
         .catch(error => {
           console.error(error.stack || error.toString())
           response.statusCode = 500
@@ -50,8 +56,23 @@ async function main() {
   })
 }
 
+function getWeight(agent: ServiceInfo): number {
+  return agent.jobCount / agent.cpuCount
+}
+
+export function sortList(list: Array<ServiceInfo>) {
+  if (list.length > 1) {
+    list.sort((a, b) => getWeight(a) - getWeight(b))
+    // if first agent weight equals to last, it means that all agents are free and no need to ignore any agent
+    if (getWeight(list[0]) !== getWeight(list[list.length - 1])) {
+      return list.slice(0, Math.ceil(list.length / 2))
+    }
+  }
+  return list
+}
+
 async function handleRequest(response: ServerResponse, request: IncomingMessage, catalog: ServiceCatalog) {
-  const list = await catalog.getServices()
+  const list = sortList(await catalog.getServices())
   if (list.length === 0) {
     console.error("No running build agents")
     response.statusCode = 503
@@ -64,8 +85,10 @@ async function handleRequest(response: ServerResponse, request: IncomingMessage,
   return `{"endpoint": "https://${service.ip}:${service.port || 443}"}`
 }
 
-main()
-  .catch(error => {
-    console.error(error.stack || error)
-    process.exit(1)
-  })
+if (process.mainModule === module) {
+  main()
+    .catch(error => {
+      console.error(error.stack || error)
+      process.exit(1)
+    })
+}

@@ -1,4 +1,11 @@
-PasswordAuthentication no
-ChallengeResponseAuthentication no
+# The default is to check both .ssh/authorized_keys and .ssh/authorized_keys2
+# but this is overridden so installations will only check .ssh/authorized_keys
+AuthorizedKeysFile .ssh/authorized_keys
+
+UseDNS no
+Subsystem sftp internal-sftp
+
 PermitRootLogin no
-AllowGroups docker
+AuthenticationMethods publickey
+MaxAuthTries 1
+AllowUsers alp

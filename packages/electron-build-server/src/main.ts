@@ -4,7 +4,8 @@ import { createServer } from "http"
 import * as redis from "ioredis"
 import * as os from "os"
 import * as path from "path"
-import { createRedisClient, createServiceInfo, ServiceEntry, ServiceRegistry } from "service-registry-redis"
+import { createRedisClient, createServiceInfo } from "service-registry-redis"
+import { ServiceRegistry } from "service-registry-redis/out/ServiceRegistry"
 import { BuildHandler } from "./buildHandler"
 import { getStageDir } from "./buildJobApi"
 import { prepareBuildTools } from "./download-required-tools"
@@ -103,7 +104,6 @@ async function main() {
       response.end()
     }
   }))
-  let serviceEntry: ServiceEntry | null = null
 
   // callback null if sync exit
   require("async-exit-hook")((callback: (() => void) | null) => {
@@ -118,6 +118,7 @@ async function main() {
       }
     }
 
+    const serviceEntry = buildHandler.serviceEntry
     if (serviceEntry != null) {
       serviceEntry.leave()
         .catch(error => {
@@ -154,9 +155,9 @@ async function main() {
   })
 
   const serviceRegistry = new ServiceRegistry(redisClient)
-  const serviceInfo = await createServiceInfo("builder", "443")
+  const serviceInfo = await createServiceInfo("443")
   console.log(JSON.stringify(serviceInfo, null, 2))
-  serviceEntry = await serviceRegistry.join(serviceInfo)
+  buildHandler.serviceEntry = await serviceRegistry.join("builder", serviceInfo)
 }
 
 main()

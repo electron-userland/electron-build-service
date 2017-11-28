@@ -112,6 +112,7 @@ export default async function processor(job: Job): Promise<BuildTaskResult> {
       publish: null,
       directories: {
         output: projectOutDir,
+        buildResources: projectDir + path.sep + info.buildResourceDirName
       },
     }, info.metadata, info.devMetadata, info.repositoryInfo)
     cleanup()

@@ -10,6 +10,7 @@ set -e
 # 9 Frankfurt
 # 24 Paris
 # 7 Amsterdam
+# 3 Dallas
 # OS 159 custom (to use startup script)
 # OS 179 CoreOS
 

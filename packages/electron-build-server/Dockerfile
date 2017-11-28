@@ -31,11 +31,13 @@ ENV LC_ALL C.UTF-8
 # do not clean apt lists because snap uses apt to install packages
 RUN apt-get --option=Dpkg::options::=--force-unsafe-io -option=Dpkg::Use-Pty=0 -qq update && \
   apt-get --option=Dpkg::options::=--force-unsafe-io -option=Dpkg::Use-Pty=0 -qq upgrade && \
-  apt-get --option=Dpkg::options::=--force-unsafe-io -option=Dpkg::Use-Pty=0 -qq --no-install-recommends install unzip snapcraft icnsutils rpm xz-utils git && \
+  apt-get --option=Dpkg::options::=--force-unsafe-io -option=Dpkg::Use-Pty=0 -qq --no-install-recommends install unzip snapcraft icnsutils rpm xz-utils git paxctl && \
   curl -L https://nodejs.org/dist/v$NODE_VERSION/node-v$NODE_VERSION-linux-x64.tar.xz | tar xJ -C /usr/local --strip-components=1 && \
   unlink /usr/local/CHANGELOG.md && unlink /usr/local/LICENSE && unlink /usr/local/README.md && \
+  paxctl -cm /usr/local/bin/node && \
   curl -L https://yarnpkg.com/latest.tar.gz | tar xz -C /usr/local --strip-components=1 && \
   curl -L https://github.com/electron-userland/electron-builder-binaries/releases/download/ran-0.1.3/zstd --output /usr/local/bin/zstd && chmod +x /usr/local/bin/zstd && \
+  apt-get --option=Dpkg::options::=--force-unsafe-io -option=Dpkg::Use-Pty=0 -qq remove paxctl && \
   apt-get --option=Dpkg::options::=--force-unsafe-io -option=Dpkg::Use-Pty=0 -qq autoremove && \
   apt-get --option=Dpkg::options::=--force-unsafe-io -option=Dpkg::Use-Pty=0 -qq clean
 
@@ -49,4 +51,4 @@ COPY --from=builder /app .
 
 EXPOSE 80
 
-CMD [ "node", "/app/out/main.js" ]
+CMD ["node", "/app/out/main.js"]

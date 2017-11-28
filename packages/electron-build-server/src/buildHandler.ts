@@ -3,6 +3,7 @@ import { CancellationToken } from "electron-builder-lib"
 import { stat, unlink } from "fs-extra-p"
 import { IncomingMessage, request, RequestOptions, ServerResponse } from "http"
 import * as path from "path"
+import { ServiceEntry } from "service-registry-redis"
 import { BuildTask, BuildTaskResult, TargetInfo } from "./buildJobApi"
 import { removeFiles } from "./util"
 
@@ -29,7 +30,26 @@ export class BuildHandler {
   private readonly createdIds = new Map<string, number>()
   private lastOrphanCheck = 0
 
+  private _jobCount = 0
+
+  serviceEntry: ServiceEntry | null = null
+
+  get jobCount() {
+    return this._jobCount
+  }
+
+  private readonly jobFinishedHandler = () => {
+    this._jobCount--
+    const serviceEntry = this.serviceEntry
+    if (serviceEntry != null) {
+      serviceEntry.info.jobCount = this._jobCount
+    }
+  }
+
   constructor(private readonly buildQueue: Queue, private readonly builderTmpDir: string) {
+    buildQueue.on("active",  job => {
+      publishEvent('{"state": "started"}', createPublishEventRequestOptions(job))
+    })
   }
 
   private checkOrphanDirs(createdIds: Map<string, number>) {
@@ -134,10 +154,20 @@ export class BuildHandler {
           return
         }
 
+        const jobFinished = job.finished()
+        this._jobCount++
+        jobFinished
+          .then(this.jobFinishedHandler)
+          .catch(this.jobFinishedHandler)
+
+        const eventRequestOptions = createPublishEventRequestOptions(job)
+        // create channel before send response to upload, push_stream_authorized_channels_only is set to "on", so, channel must be created prior to client connect
+        publishEvent('{"state": "added}', eventRequestOptions)
+
         response.statusCode = 200
         response.end(`{"id": "${requestId}"}`)
 
-        pushResult(task, job)
+        pushResult(job, jobFinished, eventRequestOptions)
           .catch(error => {
             removeFiles([archiveFile])
             console.error(`Unexpected error on pushResult: ${error.stack || error}`)
@@ -176,41 +206,46 @@ async function addJob(response: ServerResponse, jobData: BuildTask, buildQueue: 
   return job
 }
 
-async function pushResult(task: Task, job: Job) {
-  const eventRequestOptions: RequestOptions = {
+const isDebugEnabled = process.env.DEBUG != null && process.env.DEBUG!!.includes("electron-builder")
+
+function publishEvent(data: string, eventRequestOptions: RequestOptions) {
+  const eventRequest = request(eventRequestOptions)
+  eventRequest.on("error", error => {
+    console.error(`Cannot publish event: ${error.stack || error}`)
+  })
+  eventRequest.write(data.length.toString(10))
+  if (isDebugEnabled) {
+    console.log(`Publish event: ${data}`)
+  }
+  eventRequest.write(data)
+  eventRequest.end()
+}
+
+function createPublishEventRequestOptions(job: Job): RequestOptions {
+  return {
     host: process.env.NGINX_ADDRESS || "nginx",
     port: 8001,
     method: "POST",
-    path: `/publish-build-event?id=${task.id}`
+    path: `/publish-build-event?id=${job.id}`
   }
+}
 
-  function publishEvent(data: string) {
-    const eventRequest = request(eventRequestOptions)
-    eventRequest.on("error", error => {
-      console.error(`Cannot publish event: ${error.stack || error}`)
-    })
-    eventRequest.write(data.length.toString(10))
-    eventRequest.write(data)
-    eventRequest.end()
-  }
-
-  // create channel, push_stream_authorized_channels_only is set to "on", so, channel must be created prior to client connect
-  publishEvent("job added")
-
+async function pushResult(job: Job, jobFinished: Promise<BuildTaskResult>, eventRequestOptions: RequestOptions) {
   let data: BuildTaskResult
   try {
-    data = await job.finished()
+    data = await jobFinished
   }
   catch (error) {
     console.error(`Job ${job.id} error: ${error.stack || error}`)
-    publishEvent('{"error": "internal server error"}')
+    publishEvent('{"error": "internal server error"}', eventRequestOptions)
     return
   }
 
   if (data.error != null) {
-    publishEvent(JSON.stringify(data))
+    console.error(`Job ${job.id} error: ${data.error}`)
+    publishEvent(JSON.stringify(data), eventRequestOptions)
     return
   }
 
-  publishEvent(JSON.stringify({files: data.artifacts}))
+  publishEvent(JSON.stringify({files: data.artifacts}), eventRequestOptions)
 }

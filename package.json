@@ -7,13 +7,16 @@
     "//": "REDIS_ENDPOINT and ELECTRON_BUILD_SERVICE_PORT (443 by default, so, on a local machine set to 8443) envs are required",
     "start": "yarn compile && node out/main.js",
     "build": "docker build -t electronuserland/build-server -f packages/electron-build-server/Dockerfile . ",
+    "build-router": "docker build -t electronuserland/build-server-router -f packages/router/Dockerfile . ",
     "bundle": "./scripts/private/build-bundle.sh",
     "push": "docker push electronuserland/build-server",
+    "push-router": "docker push electronuserland/build-server-router",
     "start-docker": "docker run --mount type=tmpfs,destination=/tmp/ram -e ELECTRON_BUILDER_TMP_DIR=/tmp/ram -e REDIS_ENDPOINT -e DEBUG -p 8443:443 --rm electronuserland/build-server",
     "///": "https://github.com/hashicorp/packer/issues/4587#issuecomment-282916068",
     "image": "./scripts/private/build-do-image.sh",
     "up": "docker-compose up --abort-on-container-exit",
-    "up-prod": "ENV_COLOR=green LOGGING_DRIVER=json-file docker-compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.local-prod.yml up --abort-on-container-exit"
+    "up-prod": "ENV_COLOR=green LOGGING_DRIVER=json-file docker-compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.local-prod.yml up --abort-on-container-exit",
+    "up-router": "docker-compose -f packages/router/router-compose.yml -f packages/router/router-compose.dev.yml up --abort-on-container-exit"
   },
   "workspaces": [
     "packages/*"
@@ -24,6 +27,6 @@
     "electron-builder-tslint-config": "^1.1.0",
     "js-yaml": "^3.10.0",
     "tslint": "^5.8.0",
-    "typescript": "^2.6.1"
+    "typescript": "^2.6.2"
   }
 }

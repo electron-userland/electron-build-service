@@ -4,4 +4,3 @@ services:
     volumes:
       - ./certs:/run/secrets:ro
       - ./nginx-conf/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx-conf/upstream.prod.conf:/etc/nginx/upstream.conf:ro

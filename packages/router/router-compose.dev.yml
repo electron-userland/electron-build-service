@@ -1,0 +1,14 @@
+version: "3.4"
+services:
+  router:
+    command: ["node", "--inspect=0.0.0.0:9234", "/app/out/router.js"]
+    ports:
+      - target: 9234
+        published: 9234
+    volumes:
+      - ./out:/app/out
+      - ../service-registry-redis/out:/app/node_modules/service-registry-redis/out
+  router-nginx:
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ../../certs:/run/secrets:ro

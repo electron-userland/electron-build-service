@@ -2,7 +2,7 @@
   "name": "service-registry-redis",
   "version": "0.0.1",
   "description": "service-registry-redis",
-  "main": "out/main.js",
+  "main": "out/service-discovery.js",
   "files": ["out"],
   "license": "MIT",
   "dependencies": {
@@ -13,5 +13,5 @@
   "devDependencies": {
     "@types/needle": "^2.0.2"
   },
-  "typings": "./out/main.d.ts"
+  "typings": "./out/service-discovery.d.ts"
 }

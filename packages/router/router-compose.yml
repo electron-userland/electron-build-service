@@ -1,0 +1,54 @@
+version: "3.4"
+services:
+  router:
+    image: electronuserland/build-server-router
+    hostname: "{{.Node.Hostname}}-{{.Service.Name}}"
+    deploy: &DEPLOY
+      # docker swarm shows error if some other container has `mode: host` Swarm should handle this situation, but as workaround for now, just use dnsrr
+      endpoint_mode: dnsrr
+      placement:
+        constraints:
+          - node.labels.admin == true
+      restart_policy:
+        delay: 5s
+    environment:
+      - REDIS_ENDPOINT
+      - DEBUG
+      - VIRTUAL_HOST=service.electron.build
+    logging: &LOGGING
+      driver: json-file
+      options:
+        max-size: "4m"
+        max-file: "2"
+
+  router-nginx:
+    image: develar/nginx-pushstream:latest
+    hostname: "{{.Node.Hostname}}-{{.Service.Name}}"
+    command: ["./wait-for.sh", "router:80", "--", "nginx", "-g", "daemon off;"]
+    ports:
+      - target: 443
+        # will be replaced to 443 for production by script due to https://github.com/moby/moby/issues/35532#issuecomment-346753307
+        published: 8444
+        mode: host
+    configs:
+      - source: router-nginx.conf.v1
+        target: /etc/nginx/nginx.conf
+    secrets:
+      - source: builder.crt.v1
+        target: bundle.crt
+      - source: builder.key.v1
+        target: node.key
+    deploy:
+      <<: *DEPLOY
+    logging:
+      <<: *LOGGING
+
+configs:
+  router-nginx.conf.v1:
+    external: true
+
+secrets:
+  builder.crt.v1:
+    external: true
+  builder.key.v1:
+    external: true

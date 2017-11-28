@@ -7,14 +7,14 @@ services:
       # on each node labeled "builder"
       # docker node update --label-add builder=true
       mode: global
+      # nginx must access only builder on the same host. vip (virtual IP) mode causes issues on some node (cannot resolve node by virtual IP) and in any case not required (since router uses redis discovery to find build server)
+      endpoint_mode: dnsrr
       placement:
         constraints:
           - node.labels.builder == true
           - node.labels.environment == ${ENV_COLOR}
       restart_policy:
-        condition: on-failure
-        max_attempts: 10
-
+        delay: 5s
     volumes:
       - type: volume
         source: stage
@@ -28,7 +28,10 @@ services:
       - ENVIRONMENT=${ENV_COLOR}
     # about logging - https://jaxenter.com/docker-logging-gotchas-137049.html Well, docker supports journald and so, we just configure papertrail for journald.
     logging: &LOGGING
-      driver: ${LOGGING_DRIVER:-journald}
+      driver: json-file
+      options:
+        max-size: "4m"
+        max-file: "2"
 
   nginx:
     hostname: "{{.Node.Hostname}}-{{.Service.Name}}-${ENV_COLOR}"
@@ -38,10 +41,8 @@ services:
       - source: builder.key.v1
         target: node.key
     configs:
-      - source: nginx.conf.v1
+      - source: nginx.conf.v3
         target: /etc/nginx/nginx.conf
-      - source: nginx-upstream.conf.v1
-        target: /etc/nginx/upstream.conf
     volumes:
       - stage:/stage
     deploy:
@@ -59,7 +60,5 @@ secrets:
     external: true
 
 configs:
-  nginx.conf.v1:
-    external: true
-  nginx-upstream.conf.v1:
+  nginx.conf.v3:
     external: true
