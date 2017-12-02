@@ -2,7 +2,7 @@ version: "3.4"
 services:
   router:
     image: electronuserland/build-server-router
-    hostname: "{{.Node.Hostname}}-{{.Service.Name}}"
+    hostname: "{{.Node.ID}}-{{.Service.Name}}"
     deploy: &DEPLOY
       # docker swarm shows error if some other container has `mode: host` Swarm should handle this situation, but as workaround for now, just use dnsrr
       endpoint_mode: dnsrr
@@ -25,7 +25,7 @@ services:
 
   router-nginx:
     image: develar/nginx-pushstream:latest
-    hostname: "{{.Node.Hostname}}-{{.Service.Name}}"
+    hostname: "{{.Node.ID}}-{{.Service.Name}}"
     ports:
       - target: 443
         # will be replaced to 443 for production by script due to https://github.com/moby/moby/issues/35532#issuecomment-346753307

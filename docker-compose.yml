@@ -3,7 +3,7 @@ services:
   nginx:
     image: develar/nginx-pushstream
     environment:
-      - UPSTREAM_HOST=builder:80
+      - UPSTREAM_HOST=unix:/socket/builder.socket
     ports:
       - target: 443
         # will be replaced to 443 for production by script due to https://github.com/moby/moby/issues/35532#issuecomment-346753307

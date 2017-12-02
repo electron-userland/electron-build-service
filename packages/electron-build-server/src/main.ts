@@ -6,6 +6,7 @@ import * as os from "os"
 import * as path from "path"
 import { createRedisClient, createServiceInfo } from "service-registry-redis"
 import { ServiceRegistry } from "service-registry-redis/out/ServiceRegistry"
+import { listen } from "service-registry-redis/out/util"
 import { BuildHandler } from "./buildHandler"
 import { getStageDir } from "./buildJobApi"
 import { prepareBuildTools } from "./download-required-tools"
@@ -145,15 +146,11 @@ async function main() {
       })
   })
 
-  await new Promise((resolve, reject) => {
-    server.on("error", reject)
-    const port = process.env.ELECTRON_BUILD_SERVICE_PORT ? parseInt(process.env.ELECTRON_BUILD_SERVICE_PORT!!, 10) : 80
-    server.listen(port, () => {
-      console.log(`Server listening on ${server.address().address}:${server.address().port}, concurrency: ${concurrency}, temp dir: ${process.env.ELECTRON_BUILDER_TMP_DIR || "no"}, queueName: ${queueName}`)
-      resolve()
-    })
+  await listen(server, {
+    socketName: "builder",
+    explicitPort: process.env.ELECTRON_BUILD_SERVICE_PORT,
+    extraMessage: `, concurrency: ${concurrency}, temp dir: ${process.env.ELECTRON_BUILDER_TMP_DIR || "no"}, queueName: ${queueName}`,
   })
-
   const serviceRegistry = new ServiceRegistry(redisClient)
   const serviceInfo = await createServiceInfo("443")
   console.log(JSON.stringify(serviceInfo, null, 2))

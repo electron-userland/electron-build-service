@@ -1,7 +1,7 @@
-import { chmod } from "fs"
 import { createServer, IncomingMessage, ServerResponse } from "http"
 import { createRedisClient, ServiceInfo } from "service-registry-redis"
 import { ServiceCatalog } from "service-registry-redis/out/ServiceCatalog"
+import { listen } from "service-registry-redis/out/util"
 
 async function main() {
   const redisClient = await createRedisClient()
@@ -46,29 +46,9 @@ async function main() {
     })
   })
 
-  await new Promise((resolve, reject) => {
-    server.on("error", reject)
-    const explicitPort = process.env.ELECTRON_BUILD_SERVICE_ROUTER_PORT
-    if (explicitPort != null && explicitPort.length !== 0) {
-      server.listen(parseInt(explicitPort!, 10), () => {
-        console.log(`Server listening on ${server.address().address}:${server.address().port}`)
-        resolve()
-      })
-    }
-    else {
-      const socketPath = "/socket/router.socket"
-      server.listen(socketPath, () => {
-        chmod(socketPath, 0o777, error => {
-          if (error == null) {
-            console.log(`Server listening on ${socketPath}`)
-            resolve()
-          }
-          else {
-            reject(new Error(`Cannot set socket mode to 777: ${error.stack || error}`))
-          }
-        })
-      })
-    }
+  await listen(server, {
+    socketName: "router",
+    explicitPort: process.env.ELECTRON_BUILD_SERVICE_ROUTER_PORT,
   })
 }
 

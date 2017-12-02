@@ -1,7 +1,8 @@
 version: "3.4"
+# As soon as will be released next stable docker version after 17.09, .Node.ID should be replaced to .Node.Hostname
 services:
   builder:
-    hostname: "{{.Node.Hostname}}-{{.Service.Name}}"
+    hostname: "{{.Node.ID}}-{{.Service.Name}}"
     image: electronuserland/build-server
     deploy: &DEPLOY
       # on each node labeled "builder"
@@ -12,9 +13,8 @@ services:
       placement:
         constraints:
           - node.labels.builder == true
-      restart_policy:
-        delay: 5s
     volumes:
+      - socket:/socket
       - type: volume
         source: stage
         target: /stage
@@ -35,7 +35,7 @@ services:
         target: /run/secrets/redis
 
   nginx:
-    hostname: "{{.Node.Hostname}}-{{.Service.Name}}"
+    hostname: "{{.Node.ID}}-{{.Service.Name}}"
     secrets:
       - source: builder.crt.v1
         target: bundle.crt
@@ -45,7 +45,7 @@ services:
       - source: nginx.conf.v3
         target: /etc/nginx/nginx.conf
     volumes:
-      - stage:/stage
+      - socket:/socket
     deploy:
       <<: *DEPLOY
     logging:
@@ -53,6 +53,7 @@ services:
 
 volumes:
   stage:
+  socket:
 
 secrets:
   builder.crt.v1:
