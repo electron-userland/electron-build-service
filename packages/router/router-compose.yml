@@ -9,22 +9,23 @@ services:
       placement:
         constraints:
           - node.labels.admin == true
-      restart_policy:
-        delay: 5s
     environment:
       - REDIS_ENDPOINT
       - DEBUG
-      - VIRTUAL_HOST=service.electron.build
     logging: &LOGGING
       driver: json-file
       options:
         max-size: "4m"
         max-file: "2"
+    secrets:
+      - source: redis.v1
+        target: /run/secrets/redis
+    volumes:
+      - socket:/socket
 
   router-nginx:
     image: develar/nginx-pushstream:latest
     hostname: "{{.Node.Hostname}}-{{.Service.Name}}"
-    command: ["./wait-for.sh", "router:80", "--", "nginx", "-g", "daemon off;"]
     ports:
       - target: 443
         # will be replaced to 443 for production by script due to https://github.com/moby/moby/issues/35532#issuecomment-346753307
@@ -42,6 +43,12 @@ services:
       <<: *DEPLOY
     logging:
       <<: *LOGGING
+    volumes:
+      - socket:/socket
+
+volumes:
+  # no need to use tmpfs - the fs is only used to provide a system-wide name (https://stackoverflow.com/a/8438910/1910191)
+  socket:
 
 configs:
   router-nginx.conf.v1:
@@ -52,3 +59,5 @@ secrets:
     external: true
   builder.key.v1:
     external: true
+  redis.v1:
+      external: true

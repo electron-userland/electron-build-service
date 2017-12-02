@@ -25,6 +25,4 @@ WORKDIR /app
 
 COPY --from=builder /app .
 
-EXPOSE 80
-
 CMD ["node", "/app/out/router.js"]

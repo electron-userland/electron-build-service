@@ -24,7 +24,7 @@ export class ServiceCatalog {
 
     this.lastUpdate = Number.MAX_SAFE_INTEGER
     result = this.store.keys(`${KEY_PREFIX}*`)
-      .then(it => this.store.mget(it as any))
+      .then(serviceKeys => serviceKeys == null || serviceKeys.length === 0 ? [] : this.store.mget(serviceKeys as any))
       .then((result: Array<string>) => {
         this.lastUpdate = Date.now()
         return result
