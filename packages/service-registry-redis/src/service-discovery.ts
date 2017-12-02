@@ -1,3 +1,4 @@
+import { readFile } from "fs"
 import * as redis from "ioredis"
 import * as needle from "needle"
 import * as os from "os"
@@ -11,11 +12,22 @@ export const KEY_PREFIX = "services/"
 export const DEFAULT_SERVICE_ENTRY_TTL = 30
 
 // we use ioredis instead of node-redis because bull uses ioredis and we need to reuse connection
-export function createRedisClient() {
-  const redisEndpoint = process.env.REDIS_ENDPOINT
+export async function createRedisClient() {
+  let redisEndpoint = process.env.REDIS_ENDPOINT
   if (redisEndpoint == null || redisEndpoint.length === 0) {
-    throw new Error(`Env REDIS_ENDPOINT must be set to Redis database endpoint. Free plan on https://redislabs.com is suitable.`)
+    try {
+      redisEndpoint = (await promisify(readFile)("/run/secrets/redis", "utf-8")).trim()
+    }
+    catch (e) {
+      if (e.code === "ENOENT") {
+        throw new Error(`Env REDIS_ENDPOINT (or docker secret targeted to /run/secrets/redis) must be set to Redis database endpoint. Free plan on https://redislabs.com is suitable.`)
+      }
+      else {
+        throw new Error(`Cannot read redis endpoint secret file: ${e.stack || e}`)
+      }
+    }
   }
+
   console.log(`Redis endpoint (last 3 symbols): ${redisEndpoint.substring(redisEndpoint.length - 3)}`)
   return redis(redisEndpoint.startsWith("redis://") ? redisEndpoint : `redis://${redisEndpoint}`)
 }

@@ -48,7 +48,7 @@ function setupBuilderTmpDir() {
 
 async function main() {
   const builderTmpDir = setupBuilderTmpDir()
-  const redisClient = createRedisClient()
+  const redisClient = await createRedisClient()
   let subscriber: redis.Redis | null = null
   const queueName = getQueueName()
   const buildQueue = new Queue(queueName, {

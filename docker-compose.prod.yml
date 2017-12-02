@@ -1,7 +1,7 @@
 version: "3.4"
 services:
   builder:
-    hostname: "{{.Node.Hostname}}-{{.Service.Name}}-${ENV_COLOR}"
+    hostname: "{{.Node.Hostname}}-{{.Service.Name}}"
     image: electronuserland/build-server
     deploy: &DEPLOY
       # on each node labeled "builder"
@@ -12,7 +12,6 @@ services:
       placement:
         constraints:
           - node.labels.builder == true
-          - node.labels.environment == ${ENV_COLOR}
       restart_policy:
         delay: 5s
     volumes:
@@ -25,16 +24,18 @@ services:
       - REDIS_ENDPOINT
       - DEBUG
       - ELECTRON_BUILDER_TMP_DIR=/builder-tmp
-      - ENVIRONMENT=${ENV_COLOR}
     # about logging - https://jaxenter.com/docker-logging-gotchas-137049.html Well, docker supports journald and so, we just configure papertrail for journald.
     logging: &LOGGING
       driver: json-file
       options:
         max-size: "4m"
         max-file: "2"
+    secrets:
+      - source: redis.v1
+        target: /run/secrets/redis
 
   nginx:
-    hostname: "{{.Node.Hostname}}-{{.Service.Name}}-${ENV_COLOR}"
+    hostname: "{{.Node.Hostname}}-{{.Service.Name}}"
     secrets:
       - source: builder.crt.v1
         target: bundle.crt
@@ -57,6 +58,8 @@ secrets:
   builder.crt.v1:
     external: true
   builder.key.v1:
+    external: true
+  redis.v1:
     external: true
 
 configs:

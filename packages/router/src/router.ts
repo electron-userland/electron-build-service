@@ -3,7 +3,7 @@ import { createRedisClient, ServiceInfo } from "service-registry-redis"
 import { ServiceCatalog } from "service-registry-redis/out/ServiceCatalog"
 
 async function main() {
-  const redisClient = createRedisClient()
+  const redisClient = await createRedisClient()
   const catalog = new ServiceCatalog(redisClient)
   await catalog.listen()
 
@@ -63,10 +63,6 @@ function getWeight(agent: ServiceInfo): number {
 export function sortList(list: Array<ServiceInfo>) {
   if (list.length > 1) {
     list.sort((a, b) => getWeight(a) - getWeight(b))
-    // if first agent weight equals to last, it means that all agents are free and no need to ignore any agent
-    if (getWeight(list[0]) !== getWeight(list[list.length - 1])) {
-      return list.slice(0, Math.ceil(list.length / 2))
-    }
   }
   return list
 }
@@ -81,7 +77,7 @@ async function handleRequest(response: ServerResponse, request: IncomingMessage,
   }
 
   // todo take geo position in account
-  const service = list[Math.floor(Math.random() * list.length)]
+  const service = list[0]
   return `{"endpoint": "https://${service.ip}:${service.port || 443}"}`
 }
 
