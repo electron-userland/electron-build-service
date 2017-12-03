@@ -90,9 +90,12 @@ async function main() {
     const url = request.url
     if (url === "/v1/upload") {
       buildHandler.handleBuildRequest(response, request)
+      return
     }
-    else if (url != null && url.startsWith("/downloaded")) {
-      const localFile = stageDir + request.headers["x-file"]
+
+    const downloadedFile = request.headers["x-file-downloaded"]
+    if (downloadedFile != null) {
+      const localFile = stageDir + downloadedFile
       console.log(`Delete downloaded file: ${localFile}`)
       unlink(localFile)
         .catch(error => {
