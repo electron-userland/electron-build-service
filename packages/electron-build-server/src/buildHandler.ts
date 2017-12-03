@@ -222,12 +222,18 @@ function publishEvent(data: string, eventRequestOptions: RequestOptions) {
 }
 
 function createPublishEventRequestOptions(job: Job): RequestOptions {
-  return {
-    host: process.env.NGINX_ADDRESS || "nginx",
-    port: 8001,
+  const result: RequestOptions = {
     method: "POST",
     path: `/publish-build-event?id=${job.id}`
   }
+  if (process.env.NGINX_ADDRESS) {
+    result.host = process.env.NGINX_ADDRESS!!
+    result.port = 8001
+  }
+  else {
+    result.socketPath = "/socket/nginx.socket"
+  }
+  return result
 }
 
 async function pushResult(job: Job, jobFinished: Promise<BuildTaskResult>, eventRequestOptions: RequestOptions) {

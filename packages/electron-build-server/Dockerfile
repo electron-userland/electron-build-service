@@ -48,7 +48,6 @@ RUN cd /tmp/snap-project && snapcraft snap && rm -rf /tmp/snap-project
 WORKDIR /app
 
 COPY --from=builder /app .
-
-EXPOSE 80
+RUN node /app/out/download-required-tools.js
 
 CMD ["node", "/app/out/main.js"]

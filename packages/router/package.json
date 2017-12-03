@@ -6,7 +6,7 @@
   "files": ["out"],
   "license": "MIT",
   "dependencies": {
-    "ioredis": "^3.2.1",
+    "ioredis": "^3.2.2",
     "service-registry-redis": "0.0.1"
   },
   "typings": "./out/router.d.ts"

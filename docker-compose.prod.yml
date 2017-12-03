@@ -15,9 +15,7 @@ services:
           - node.labels.builder == true
     volumes:
       - socket:/socket
-      - type: volume
-        source: stage
-        target: /stage
+      - stage:/stage
       - type: tmpfs
         target: /builder-tmp
     environment:
@@ -35,6 +33,7 @@ services:
         target: /run/secrets/redis
 
   nginx:
+    command: ["/bin/sh", "-c", "rm -f /socket/nginx.socket && /start.sh -g 'daemon off;'"]
     hostname: "{{.Node.ID}}-{{.Service.Name}}"
     secrets:
       - source: builder.crt.v1
@@ -42,10 +41,11 @@ services:
       - source: builder.key.v1
         target: node.key
     configs:
-      - source: nginx.conf.v3
+      - source: nginx.conf.v4
         target: /etc/nginx/nginx.conf
     volumes:
       - socket:/socket
+      - stage:/stage
     deploy:
       <<: *DEPLOY
     logging:
@@ -64,5 +64,5 @@ secrets:
     external: true
 
 configs:
-  nginx.conf.v3:
+  nginx.conf.v4:
     external: true

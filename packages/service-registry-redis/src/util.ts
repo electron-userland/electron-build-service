@@ -1,4 +1,4 @@
-import { chmod } from "fs"
+import { chmod, unlink } from "fs"
 import { Server } from "net"
 
 export interface ListenOptions {
@@ -20,15 +20,19 @@ export function listen(server: Server, options: ListenOptions) {
     }
 
     const socketPath = `/socket/${options.socketName}.socket`
-    server.listen(socketPath, () => {
-      chmod(socketPath, 0o777, error => {
-        if (error == null) {
-          console.log(`Server listening on ${socketPath}${options.extraMessage}`)
-          resolve()
-        }
-        else {
-          reject(new Error(`Cannot set socket mode to 777: ${error.stack || error}`))
-        }
+    unlink(socketPath, () => {
+      // ignore unlink error
+
+      server.listen(socketPath, () => {
+        chmod(socketPath, 0o777, error => {
+          if (error == null) {
+            console.log(`Server listening on ${socketPath}${options.extraMessage}`)
+            resolve()
+          }
+          else {
+            reject(new Error(`Cannot set socket mode to 777: ${error.stack || error}`))
+          }
+        })
       })
     })
   })
