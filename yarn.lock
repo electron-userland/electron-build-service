@@ -3,8 +3,8 @@
 
 
 "7zip-bin-linux@^1.1.0":
-  version "1.1.0"
-  resolved "https://registry.yarnpkg.com/7zip-bin-linux/-/7zip-bin-linux-1.1.0.tgz#2ca309fd6a2102e18bd81e3a5d91b39db9adab71"
+  version "1.2.0"
+  resolved "https://registry.yarnpkg.com/7zip-bin-linux/-/7zip-bin-linux-1.2.0.tgz#c0ddfb640b255e14bd6730c26af45b2669c0193c"
 
 "7zip-bin-mac@^1.0.1":
   version "1.0.1"
@@ -14,13 +14,17 @@
   version "2.1.1"
   resolved "https://registry.yarnpkg.com/7zip-bin-win/-/7zip-bin-win-2.1.1.tgz#8acfc28bb34e53a9476b46ae85a97418e6035c20"
 
-"7zip-bin@^2.2.7":
-  version "2.2.7"
-  resolved "https://registry.yarnpkg.com/7zip-bin/-/7zip-bin-2.2.7.tgz#724802b8d6bda0bf2cfe61a4b86a820efc8ece93"
+"7zip-bin@^2.2.7", "7zip-bin@^2.3.3":
+  version "2.3.3"
+  resolved "https://registry.yarnpkg.com/7zip-bin/-/7zip-bin-2.3.3.tgz#20fef9e4b7500ebfa13df2742782cdfd1151e628"
   optionalDependencies:
     "7zip-bin-linux" "^1.1.0"
     "7zip-bin-mac" "^1.0.1"
     "7zip-bin-win" "^2.1.1"
+
+"@types/events@*":
+  version "1.1.0"
+  resolved "https://registry.yarnpkg.com/@types/events/-/events-1.1.0.tgz#93b1be91f63c184450385272c47b6496fd028e02"
 
 "@types/ioredis@^3.2.1":
   version "3.2.1"
@@ -35,8 +39,10 @@
     "@types/node" "*"
 
 "@types/node@*", "@types/node@^8.0.53":
-  version "8.0.53"
-  resolved "https://registry.yarnpkg.com/@types/node/-/node-8.0.53.tgz#396b35af826fa66aad472c8cb7b8d5e277f4e6d8"
+  version "8.0.54"
+  resolved "https://registry.yarnpkg.com/@types/node/-/node-8.0.54.tgz#3fd9357db4af388b79e03845340259440edffde6"
+  dependencies:
+    "@types/events" "*"
 
 ajv-keywords@^2.1.0:
   version "2.1.1"
@@ -339,11 +345,11 @@ ejs@^2.5.7:
   version "2.5.7"
   resolved "https://registry.yarnpkg.com/ejs/-/ejs-2.5.7.tgz#cc872c168880ae3c7189762fd5ffc00896c9518a"
 
-electron-builder-lib@19.47.2:
-  version "19.47.2"
-  resolved "https://registry.yarnpkg.com/electron-builder-lib/-/electron-builder-lib-19.47.2.tgz#b55513a3708b5765dec03991ce59c8b64be8e5f0"
+electron-builder-lib@19.47.3:
+  version "19.47.3"
+  resolved "https://registry.yarnpkg.com/electron-builder-lib/-/electron-builder-lib-19.47.3.tgz#ba3c88a41715c2a11584560a3064c8afb074239c"
   dependencies:
-    "7zip-bin" "^2.2.7"
+    "7zip-bin" "^2.3.3"
     app-package-builder "1.5.2"
     asar-integrity "0.2.3"
     async-exit-hook "^2.0.1"

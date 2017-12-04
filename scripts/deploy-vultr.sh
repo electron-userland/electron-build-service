@@ -7,9 +7,14 @@ set -e
 # to see OS ids: vultr os
 # to see region ids: vultr regions
 
+# Plans:
+# 201 - 5 usd (1 CPU, 1GB RAM)
+# 203 - 20 usd (2 CPU, 4GB RAM)
+
 # 9 Frankfurt
 # 24 Paris
 # 7 Amsterdam
+# 8 London
 # 3 Dallas
 # OS 159 custom (to use startup script)
 # OS 179 CoreOS
@@ -19,5 +24,8 @@ set -e
 vultr server create --name=electron-builder-service --hostname=electron-builder-service-green --region=24 --plan=201 --os=159 --script=224121 --ipv6=true --notify-activate=false
 vultr server create --name=electron-builder-service --hostname=electron-builder-service-green --region=24 --plan=201 --os=159 --script=226069 --ipv6=true --notify-activate=false
 
+# DO NOT FORGET TO CHANGE HOSTNAME
+
 # Amsterdam
-vultr server create --name=bs-ams1 --hostname=bs-ams1 --region=7 --plan=201 --os=179 --script=226072 --user-data=scripts/private/cloud-config.yml --ipv6=true --notify-activate=false
+vultr server create --name=bs-ams1 --hostname=bs-ams1 --region=8 --plan=203 --os=179 --script=226072 --user-data=scripts/private/cloud-config.yml --ipv6=true --notify-activate=false
+vultr server create --name=london1 --hostname=london1 --region=8 --plan=203 --os=179 --script=226072 --user-data=scripts/private/cloud-config.yml --ipv6=true --notify-activate=false

@@ -14,6 +14,8 @@ RUN yarn compile && \
   yarn pack --cwd packages/electron-build-server --filename /tmp/f.tgz && tar xf /tmp/f.tgz -C /app --strip 1 && \
   unlink node_modules/service-registry-redis && \
   unlink node_modules/electron-build-server && \
+  rm -r node_modules/7zip-bin-linux/arm && \
+  rm -r node_modules/7zip-bin-linux/ia32 && \
   mv node_modules /app/node_modules && \
   mkdir /app/node_modules/service-registry-redis && yarn pack --cwd packages/service-registry-redis --filename /tmp/f.tgz && tar xf /tmp/f.tgz -C /app/node_modules/service-registry-redis --strip 1
 
