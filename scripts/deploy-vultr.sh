@@ -28,4 +28,5 @@ vultr server create --name=electron-builder-service --hostname=electron-builder-
 
 # Amsterdam
 vultr server create --name=bs-ams1 --hostname=bs-ams1 --region=8 --plan=203 --os=179 --script=226072 --user-data=scripts/private/cloud-config.yml --ipv6=true --notify-activate=false
-vultr server create --name=london1 --hostname=london1 --region=8 --plan=203 --os=179 --script=226072 --user-data=scripts/private/cloud-config.yml --ipv6=true --notify-activate=false
+
+vultr server create --name=dallas1 --hostname=dallas1 --region=3 --plan=203 --os=179 --script=226072 --user-data=scripts/private/cloud-config.yml --ipv6=true --notify-activate=false

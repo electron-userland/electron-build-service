@@ -1,5 +1,5 @@
 import * as Queue from "bull"
-import { emptyDir, unlink } from "fs-extra-p"
+import { emptyDir } from "fs-extra-p"
 import { createServer } from "http"
 import * as redis from "ioredis"
 import * as os from "os"
@@ -93,20 +93,19 @@ async function main() {
       return
     }
 
-    const downloadedFile = request.headers["x-file-downloaded"]
-    if (downloadedFile != null) {
-      const localFile = stageDir + downloadedFile
-      console.log(`Delete downloaded file: ${localFile}`)
-      unlink(localFile)
-        .catch(error => {
-          console.error(`Cannot delete file ${localFile}: ${error.stack || error}`)
-        })
+    if (url != null && url.startsWith("/v1/complete/")) {
+      const completedId = request.headers["x-id"]
+      if (completedId != null) {
+        response.statusCode = 200
+        response.end()
+        buildHandler.clientDownloadedAllFiles(completedId as string)
+        return
+      }
     }
-    else {
-      console.error(`Unsupported route: ${url}`)
-      response.statusCode = 404
-      response.end()
-    }
+
+    console.error(`Unsupported route: ${url}`)
+    response.statusCode = 404
+    response.end()
   }))
 
   // callback null if sync exit

@@ -24,10 +24,9 @@ services:
       - ELECTRON_BUILDER_TMP_DIR=/builder-tmp
     # about logging - https://jaxenter.com/docker-logging-gotchas-137049.html Well, docker supports journald and so, we just configure papertrail for journald.
     logging: &LOGGING
-      driver: json-file
+      driver: journald
       options:
-        max-size: "4m"
-        max-file: "2"
+        tag: "{{.Name}}"
     secrets:
       - source: redis.v1
         target: /run/secrets/redis

@@ -4,7 +4,7 @@ import { stat, unlink } from "fs-extra-p"
 import { IncomingMessage, request, RequestOptions, ServerResponse } from "http"
 import * as path from "path"
 import { ServiceEntry } from "service-registry-redis"
-import { BuildTask, BuildTaskResult, TargetInfo } from "./buildJobApi"
+import { BuildTask, BuildTaskResult, getStageDir, TargetInfo } from "./buildJobApi"
 import { removeFiles } from "./util"
 
 const nanoid = require("nanoid")
@@ -16,8 +16,8 @@ class Task {
   }
 }
 
-// 60 minutes (quite enough for user to download file)
-const ORPHAN_DIR_TTL = 60 * 60 * 1000
+// 30 minutes (quite enough for user to download file)
+const ORPHAN_DIR_TTL = 30 * 60 * 1000
 // const ORPHAN_DIR_TTL = 20 * 1000
 // 1 minute
 const ORPHAN_DIR_CHECK_TTL = 60 * 1000
@@ -38,12 +38,22 @@ export class BuildHandler {
     return this._jobCount
   }
 
+  clientDownloadedAllFiles(id: string) {
+    console.log(`Client completed: ${id}`)
+    this.createdIds.delete(id)
+    removeFiles(this.getJobDirs(id))
+  }
+
   private readonly jobFinishedHandler = () => {
     this._jobCount--
     const serviceEntry = this.serviceEntry
     if (serviceEntry != null) {
       serviceEntry.info.jobCount = this._jobCount
     }
+  }
+
+  private getJobDirs(id: string) {
+    return [this.builderTmpDir + path.sep + id, getStageDir() + path.sep + id]
   }
 
   constructor(private readonly buildQueue: Queue, private readonly builderTmpDir: string) {
@@ -67,7 +77,7 @@ export class BuildHandler {
       const createdAt = createdIds.get(id)!!
       if ((now - createdAt) > ORPHAN_DIR_TTL) {
         createdIds.delete(id)
-        toDelete.push(this.builderTmpDir + path.sep + id)
+        toDelete.push(...this.getJobDirs(id))
       }
     }
     if (toDelete.length > 0) {

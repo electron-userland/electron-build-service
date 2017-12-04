@@ -1,4 +1,4 @@
-Servers hosted on Vultr.
+Servers hosted on [Vultr](https://www.vultr.com/?ref=7263602) and [UpCloud](https://www.upcloud.com/register/?promo=Z78TBU) (links are [referral](https://www.upcloud.com/blog/join-our-referral-program/)).
 
 ## Scaleway
 

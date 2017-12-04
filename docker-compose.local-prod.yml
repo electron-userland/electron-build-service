@@ -1,6 +1,13 @@
 version: "3.4"
 services:
+  builder:
+    logging:
+      driver: json-file
+      options: {}
   nginx:
+    logging:
+      driver: json-file
+      options: {}
     volumes:
       - ./certs:/run/secrets:ro
       - ./nginx-conf/nginx.conf:/etc/nginx/nginx.conf:ro

@@ -15,7 +15,7 @@
     "///": "https://github.com/hashicorp/packer/issues/4587#issuecomment-282916068",
     "image": "./scripts/private/build-do-image.sh",
     "up": "docker-compose up --abort-on-container-exit",
-    "up-prod": "LOGGING_DRIVER=json-file docker-compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.local-prod.yml up --abort-on-container-exit",
+    "up-prod": "docker-compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.local-prod.yml up --abort-on-container-exit",
     "up-router": "docker-compose -f packages/router/router-compose.yml -f packages/router/router-compose.dev.yml up --abort-on-container-exit",
     "dist": "yarn build && yarn build-router && yarn push && yarn push-router && yarn bundle"
   },

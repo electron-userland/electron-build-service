@@ -13,10 +13,9 @@ services:
       - REDIS_ENDPOINT
       - DEBUG
     logging: &LOGGING
-      driver: json-file
+      driver: journald
       options:
-        max-size: "4m"
-        max-file: "2"
+        tag: "{{.Name}}"
     secrets:
       - source: redis.v1
         target: /run/secrets/redis
