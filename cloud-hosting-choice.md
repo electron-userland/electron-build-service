@@ -1,4 +1,4 @@
-Servers hosted on [Vultr](https://www.vultr.com/?ref=7263602) and [UpCloud](https://www.upcloud.com/register/?promo=Z78TBU) (links are [referral](https://www.upcloud.com/blog/join-our-referral-program/)).
+Servers hosted on [Vultr](https://www.vultr.com/?ref=7263602) (build servers) and [UpCloud](https://www.upcloud.com/register/?promo=Z78TBU) (router and other control services) (links are [referral](https://www.upcloud.com/blog/join-our-referral-program/)).
 
 ## Scaleway
 
@@ -25,13 +25,19 @@ The only issue why it is not a winner — price. For 20$ on Vultr you will get 4
 
 Well... CPU as Vultr, price and RAM as UpCloud. So, no reason to use it. Benchmark "build AppImage and deb" was not performed, because results of "build AppImage" is enough to say that UpCloud is a winner (again, Vultr offers you twice more memory for the same price).
 
+## Linode
+
+Linode was good 5 years ago, but now no reason even try to use it and do benchmarks. Anyway, see why [Linode was rejected](https://github.com/develar/electron-build-service/issues/3#issuecomment-349280483).
+
 ## Benchmarks
 
-Ok, Scaleway sucks, but maybe 14$ for 4 Atom CPU and 8 GB RAM is a good reasons to overcome all issues (e.g. use Ubuntu instead of CoreOS)?
+Ok, Scaleway sucks, but maybe 14$ for 4 Atom CPU and 8 GB RAM is a good reason to overcome all issues (e.g. use Ubuntu instead of CoreOS, take a risk to use outdated and not tested Linux Kernel to be able reboot server)?
 Well, to build AppImage (gzip, not CPU hungry) and deb (CPU hungry because of xz compression using 7z):
 * Vultr: 81s 43ms
 * Scaleway: 111s 913ms
 
-Why? Because Atom CPU is slow compared to 1 vCPU on Vultr/Upcloud. Of course, xz must be not used because slow and not badly implemented (not really multi-threaded), only 7z must be, but still. So, 4 Atom CPU for build task is not so good as 2 vCPU.
+Why? Because Atom CPU is slow compared to 1 vCPU on Vultr/UpCloud. Of course, xz must be not used because slow and badly implemented (not really multi-threaded), only 7z must be, but still. So, 4 Atom CPU for build task is not so good as 2 vCPU even if you use modern decent multi-cpu aware software like 7zip.
 
 So, even if Vultr costs 20$ (not 14$) and offers 4 GB RAM instead of 8 GB RAM, Vultr is a winner.
+
+Yes, UpCloud vCPU is more powerful compared to Vultr vCPU, but RAM not enough. It is a reason why Vultr 10$ plans is not used, only 20$+ — build job concurrency equals to cpuCount + 1. So, for 10$ server it means that there is a chance that second job will fail with out of memory (1 vCPU and 2 GB RAM).

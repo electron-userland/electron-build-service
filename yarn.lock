@@ -14,9 +14,9 @@
   version "2.1.1"
   resolved "https://registry.yarnpkg.com/7zip-bin-win/-/7zip-bin-win-2.1.1.tgz#8acfc28bb34e53a9476b46ae85a97418e6035c20"
 
-"7zip-bin@^2.2.7", "7zip-bin@^2.3.3":
-  version "2.3.3"
-  resolved "https://registry.yarnpkg.com/7zip-bin/-/7zip-bin-2.3.3.tgz#20fef9e4b7500ebfa13df2742782cdfd1151e628"
+"7zip-bin@^2.2.7", "7zip-bin@^2.3.4":
+  version "2.3.4"
+  resolved "https://registry.yarnpkg.com/7zip-bin/-/7zip-bin-2.3.4.tgz#0861a3c99793dd794f4dd6175ec4ddfa6af8bc9d"
   optionalDependencies:
     "7zip-bin-linux" "^1.1.0"
     "7zip-bin-mac" "^1.0.1"
@@ -188,8 +188,8 @@ builtin-modules@^1.0.0, builtin-modules@^1.1.1:
   resolved "https://registry.yarnpkg.com/builtin-modules/-/builtin-modules-1.1.1.tgz#270f076c5a72c02f5b65a47df94c5fe3a278892f"
 
 bull@^3.3.6:
-  version "3.3.6"
-  resolved "https://registry.yarnpkg.com/bull/-/bull-3.3.6.tgz#d622add5c434af1612e3197f62c89270a8fe1449"
+  version "3.3.7"
+  resolved "https://registry.yarnpkg.com/bull/-/bull-3.3.7.tgz#d8075830134dab28b075bd0bcd2aa5144a5c4218"
   dependencies:
     bluebird "^3.5.0"
     cron-parser "^2.4.1"
@@ -345,11 +345,11 @@ ejs@^2.5.7:
   version "2.5.7"
   resolved "https://registry.yarnpkg.com/ejs/-/ejs-2.5.7.tgz#cc872c168880ae3c7189762fd5ffc00896c9518a"
 
-electron-builder-lib@19.47.3:
-  version "19.47.3"
-  resolved "https://registry.yarnpkg.com/electron-builder-lib/-/electron-builder-lib-19.47.3.tgz#ba3c88a41715c2a11584560a3064c8afb074239c"
+electron-builder-lib@19.48.0:
+  version "19.48.0"
+  resolved "https://registry.yarnpkg.com/electron-builder-lib/-/electron-builder-lib-19.48.0.tgz#e19145ae972d424c128200b364af4a11d9e48ad9"
   dependencies:
-    "7zip-bin" "^2.3.3"
+    "7zip-bin" "^2.3.4"
     app-package-builder "1.5.2"
     asar-integrity "0.2.3"
     async-exit-hook "^2.0.1"

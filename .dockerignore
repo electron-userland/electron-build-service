@@ -11,3 +11,4 @@ test
 terraform.*
 **/.bin
 docker-compose.yml
+scripts/private

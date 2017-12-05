@@ -1,0 +1,61 @@
+configs:
+  router-nginx.conf.v1:
+    external: true
+secrets:
+  builder.crt.v1:
+    external: true
+  builder.key.v1:
+    external: true
+  redis.v1:
+    external: true
+services:
+  router:
+    deploy:
+      endpoint_mode: dnsrr
+      placement:
+        constraints:
+        - node.labels.admin == true
+    environment:
+      DEBUG: null
+      REDIS_ENDPOINT: null
+    hostname: '{{.Node.ID}}-{{.Service.Name}}'
+    image: electronuserland/build-server-router@sha256:d0cefadf6277fe75dff17b585a3aad5baf2a662986866ab9eb55226c845f406e
+    logging:
+      driver: journald
+      options:
+        tag: '{{.Name}}'
+    secrets:
+    - source: redis.v1
+      target: /run/secrets/redis
+    volumes:
+    - socket:/socket:rw
+  router-nginx:
+    configs:
+    - source: router-nginx.conf.v1
+      target: /etc/nginx/nginx.conf
+    deploy:
+      endpoint_mode: dnsrr
+      placement:
+        constraints:
+        - node.labels.admin == true
+    hostname: '{{.Node.ID}}-{{.Service.Name}}'
+    image: develar/nginx-pushstream@sha256:2f74affd13515882e57f2e6ca7e7a7ffc4ba343b80be67c4fcce5e20c634c2da
+    logging:
+      driver: journald
+      options:
+        tag: '{{.Name}}'
+    ports:
+    - mode: host
+      published: 443
+      target: 443
+    secrets:
+    - source: builder.crt.v1
+      target: bundle.crt
+    - source: builder.key.v1
+      target: node.key
+    volumes:
+    - socket:/socket:rw
+version: '3.4'
+volumes:
+  socket: {}
+

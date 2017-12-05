@@ -1,0 +1,74 @@
+configs:
+  nginx.conf.v6:
+    external: true
+secrets:
+  builder.crt.v1:
+    external: true
+  builder.key.v1:
+    external: true
+  redis.v1:
+    external: true
+services:
+  builder:
+    deploy:
+      endpoint_mode: dnsrr
+      mode: global
+      placement:
+        constraints:
+          - node.labels.builder == true
+    environment:
+      DEBUG: null
+      ELECTRON_BUILDER_TMP_DIR: /builder-tmp
+      REDIS_ENDPOINT: null
+    hostname: '{{.Node.ID}}-{{.Service.Name}}'
+    image: 'electronuserland/build-server@sha256:0b38dab07f86dab356f2bbaaf85f4dc4b2ea1ad7a61f7afad93e6714d48e9451'
+    logging:
+      driver: journald
+      options:
+        tag: '{{.Name}}'
+    secrets:
+      - source: redis.v1
+        target: /run/secrets/redis
+    volumes:
+      - 'socket:/socket'
+      - 'stage:/stage'
+      - type: tmpfs
+        target: /builder-tmp
+  nginx:
+    command:
+      - /bin/sh
+      - '-c'
+      - rm -f /socket/nginx.socket && /start.sh -g 'daemon off;'
+    configs:
+      - source: nginx.conf.v6
+        target: /etc/nginx/nginx.conf
+    deploy:
+      endpoint_mode: dnsrr
+      mode: global
+      placement:
+        constraints:
+          - node.labels.builder == true
+    environment:
+      UPSTREAM_HOST: 'unix:/socket/builder.socket'
+    hostname: '{{.Node.ID}}-{{.Service.Name}}'
+    image: 'develar/nginx-pushstream@sha256:2f74affd13515882e57f2e6ca7e7a7ffc4ba343b80be67c4fcce5e20c634c2da'
+    logging:
+      driver: journald
+      options:
+        tag: '{{.Name}}'
+    ports:
+      - mode: host
+        published: 443
+        target: 443
+    secrets:
+      - source: builder.crt.v1
+        target: bundle.crt
+      - source: builder.key.v1
+        target: node.key
+    volumes:
+      - 'socket:/socket:rw'
+      - 'stage:/stage:rw'
+version: '3.4'
+volumes:
+  socket: {}
+  stage: {}

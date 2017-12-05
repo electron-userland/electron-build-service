@@ -40,7 +40,7 @@ services:
       - source: builder.key.v1
         target: node.key
     configs:
-      - source: nginx.conf.v5
+      - source: nginx.conf.v6
         target: /etc/nginx/nginx.conf
     volumes:
       - socket:/socket
@@ -63,5 +63,5 @@ secrets:
     external: true
 
 configs:
-  nginx.conf.v5:
+  nginx.conf.v6:
     external: true
