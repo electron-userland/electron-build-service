@@ -21,9 +21,10 @@ services:
     hostname: '{{.Node.ID}}-{{.Service.Name}}'
     image: electronuserland/build-server-router@sha256:d0cefadf6277fe75dff17b585a3aad5baf2a662986866ab9eb55226c845f406e
     logging:
-      driver: journald
+      driver: json-file
       options:
-        tag: '{{.Name}}'
+        max-file: '2'
+        max-size: 4m
     secrets:
     - source: redis.v1
       target: /run/secrets/redis
@@ -41,9 +42,10 @@ services:
     hostname: '{{.Node.ID}}-{{.Service.Name}}'
     image: develar/nginx-pushstream@sha256:2f74affd13515882e57f2e6ca7e7a7ffc4ba343b80be67c4fcce5e20c634c2da
     logging:
-      driver: journald
+      driver: json-file
       options:
-        tag: '{{.Name}}'
+        max-file: '2'
+        max-size: 4m
     ports:
     - mode: host
       published: 443

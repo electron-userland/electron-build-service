@@ -11,9 +11,6 @@ update_engine_client -update
 
 systemctl enable /etc/systemd/system/papertrail.service
 systemctl mask fleet.socket --now
-
-# after start:
-# systemctl mask update-engine.service --now
-# systemctl mask locksmithd.service --now
+# do not disable update service - it is convenient just log in to machine and reboot when need instead of invoke update manually
 
 reboot

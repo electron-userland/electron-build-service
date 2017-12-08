@@ -1,4 +1,10 @@
-Servers hosted on [Vultr](https://www.vultr.com/?ref=7263602) (build servers) and [UpCloud](https://www.upcloud.com/register/?promo=Z78TBU) (router and other control services) (links are [referral](https://www.upcloud.com/blog/join-our-referral-program/)).
+Servers hosted on:
+
+* [OVH](https://www.ovh.com/) — constantly running build servers.
+* [Vultr](https://www.vultr.com/?ref=7263602) — build servers on demand (reserve).
+* [UpCloud](https://www.upcloud.com/register/?promo=Z78TBU) — router and other control services. 
+
+(links are [referral](https://www.upcloud.com/blog/join-our-referral-program/)).
 
 ## Scaleway
 
@@ -14,6 +20,17 @@ In general, good. There are number of minor issues, that's make Vultr not so awe
 
 * Snapshot per the whole disk, as result, very slow. At least 3 minutes is required to restore (25 GB SSD). So, this feature is not usable at all, and it is more suitable just create a new server from scratch using boot script (~45 seconds).
 * Not easy to install CoreOS because at least 2 GB RAM is required, and provided image is outdated. Solution? Just install provided image and upgrade (adds ~10 seconds to setup new server).
+
+## OVH
+
+VPS Cloud.
+
+* No sexy UI (but UI is still fully functional and quite usable).
+* No explicit ISO or iPXE support.
+* ~3 minutes to install, then ~3 minutes to boot in Resque mode to install custom OS.
+* No hourly billing. 
+
+But NVMe disks (and as result, superior performance), ability to install any OS using Resque mode. What else do you want?
 
 ## UpCloud
 
@@ -33,11 +50,12 @@ Linode was good 5 years ago, but now no reason even try to use it and do benchma
 
 Ok, Scaleway sucks, but maybe 14$ for 4 Atom CPU and 8 GB RAM is a good reason to overcome all issues (e.g. use Ubuntu instead of CoreOS, take a risk to use outdated and not tested Linux Kernel to be able reboot server)?
 Well, to build AppImage (gzip, not CPU hungry) and deb (CPU hungry because of xz compression using 7z):
-* Vultr: 81s 43ms
-* Scaleway: 111s 913ms
+* Vultr: 81s 43ms (20$)
+* OVH: 59s 668ms (VPS Cloud 2, 19$ or 17$ if pay per year)
+* Scaleway: 111s 913ms (C2S)
 
 Why? Because Atom CPU is slow compared to 1 vCPU on Vultr/UpCloud. Of course, xz must be not used because slow and badly implemented (not really multi-threaded), only 7z must be, but still. So, 4 Atom CPU for build task is not so good as 2 vCPU even if you use modern decent multi-cpu aware software like 7zip.
 
-So, even if Vultr costs 20$ (not 14$) and offers 4 GB RAM instead of 8 GB RAM, Vultr is a winner.
+So, even if Vultr costs 20$ (not 14$) and offers 4 GB RAM instead of 8 GB RAM, Vultr/OVH is a winner.
 
 Yes, UpCloud vCPU is more powerful compared to Vultr vCPU, but RAM not enough. It is a reason why Vultr 10$ plans is not used, only 20$+ — build job concurrency equals to cpuCount + 1. So, for 10$ server it means that there is a chance that second job will fail with out of memory (1 vCPU and 2 GB RAM).

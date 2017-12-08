@@ -35,12 +35,15 @@ Communication is encrypted. Custom certificate authority is used and required by
 
 To disable using Electron Build Service set option `remoteBuild: false` in the [electron-builder](https://github.com/electron-userland/electron-builder).
 
-## Server Locations
+### Server Locations
 
 * Europe — Amsterdam, Frankfurt and London.
 * USA — Dallas.
+* Canada — Beauharnois.
 
 Which build server will be used is not predictable. Your actual location is not used for now to select build server, but planned (by IP address).
+
+See [Cloud Hosting Choice](cloud-hosting-choice.md) about used providers.
 
 ## Build Time
 
