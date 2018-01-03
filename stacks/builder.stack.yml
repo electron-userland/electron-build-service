@@ -1,5 +1,5 @@
 configs:
-  nginx.conf.v6:
+  nginx.conf.v7:
     external: true
 secrets:
   builder.crt.v1:
@@ -21,7 +21,7 @@ services:
       ELECTRON_BUILDER_TMP_DIR: /builder-tmp
       REDIS_ENDPOINT: null
     hostname: '{{.Node.ID}}-{{.Service.Name}}'
-    image: 'electronuserland/build-server@sha256:0b38dab07f86dab356f2bbaaf85f4dc4b2ea1ad7a61f7afad93e6714d48e9451'
+    image: 'electronuserland/build-server@sha256:aaada9dc725cee44473d545ac3632e4fb6bac886bc85ad896ac9a144aeb21bfa'
     logging:
       driver: json-file
       options:
@@ -41,7 +41,7 @@ services:
       - '-c'
       - rm -f /socket/nginx.socket && /start.sh -g 'daemon off;'
     configs:
-      - source: nginx.conf.v6
+      - source: nginx.conf.v7
         target: /etc/nginx/nginx.conf
     deploy:
       endpoint_mode: dnsrr

@@ -12,8 +12,6 @@
     "push": "docker push electronuserland/build-server",
     "push-router": "docker push electronuserland/build-server-router",
     "start-docker": "docker run --mount type=tmpfs,destination=/tmp/ram -e ELECTRON_BUILDER_TMP_DIR=/tmp/ram -e REDIS_ENDPOINT -e DEBUG -p 8443:443 --rm electronuserland/build-server",
-    "///": "https://github.com/hashicorp/packer/issues/4587#issuecomment-282916068",
-    "image": "./scripts/private/build-do-image.sh",
     "up": "docker-compose up --abort-on-container-exit",
     "up-prod": "docker-compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.local-prod.yml up --abort-on-container-exit",
     "up-router": "docker-compose -f packages/router/router-compose.yml -f packages/router/router-compose.dev.yml up --abort-on-container-exit",
@@ -23,8 +21,8 @@
     "packages/*"
   ],
   "devDependencies": {
-    "@types/ioredis": "^3.2.1",
-    "@types/node": "^8.0.53",
+    "@types/ioredis": "^3.2.5",
+    "@types/node": "^8.5.2",
     "electron-builder-tslint-config": "^1.1.0",
     "js-yaml": "^3.10.0",
     "tslint": "^5.8.0",

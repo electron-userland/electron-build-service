@@ -49,7 +49,7 @@ export class ServiceRegistry {
       .then(() => {
         this.scheduleUpdateServiceEntryTtl(entry)
         return entry
-      })
+      }) as any
   }
 
   leave(serviceEntry: ServiceEntry): Promise<void> {
@@ -58,6 +58,6 @@ export class ServiceRegistry {
       .multi()
       .del(serviceEntry.key)
       .publish(ServiceChannels.LEAVE, serviceEntry.key)
-      .exec()
+      .exec() as any
   }
 }

@@ -34,9 +34,9 @@ export class ServiceCatalog {
       .catch(e => {
         this.lastUpdate = -1
         throw e
-      })
+      }) as any
     this.serviceListPromise = result
-    return result
+    return result!!
   }
 
   listen() {
