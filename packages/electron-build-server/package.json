@@ -7,9 +7,9 @@
   "license": "MIT",
   "dependencies": {
     "async-exit-hook": "^2.0.1",
-    "builder-util": "^4.1.1",
-    "bull": "^3.3.7",
-    "electron-builder-lib": "19.52.1",
+    "builder-util": "^4.2.1",
+    "bull": "^3.3.8",
+    "electron-builder-lib": "19.55.1",
     "fs-extra-p": "^4.5.0",
     "service-registry-redis": "0.0.1",
     "ioredis": "^3.2.2",

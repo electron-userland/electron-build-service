@@ -21,7 +21,7 @@ services:
       ELECTRON_BUILDER_TMP_DIR: /builder-tmp
       REDIS_ENDPOINT: null
     hostname: '{{.Node.ID}}-{{.Service.Name}}'
-    image: 'electronuserland/build-server@sha256:aaada9dc725cee44473d545ac3632e4fb6bac886bc85ad896ac9a144aeb21bfa'
+    image: 'electronuserland/build-server@sha256:7480ff9495ce28e9a896212875272043e3535f8ce0b7a7d9ccce25b6590c6d16'
     logging:
       driver: json-file
       options:

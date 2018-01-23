@@ -19,7 +19,7 @@ services:
       DEBUG: null
       REDIS_ENDPOINT: null
     hostname: '{{.Node.ID}}-{{.Service.Name}}'
-    image: electronuserland/build-server-router@sha256:cb0765ec29606b08886b5ab80d267e9e04148fd9138915c80a033aca0218c72b
+    image: electronuserland/build-server-router@sha256:69ac55c869b8a8f4144fabf16131a9e01ba961061d49e51859e173a4a7b6f0ef
     logging:
       driver: json-file
       options:
