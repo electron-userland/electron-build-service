@@ -7,8 +7,8 @@ import { ArtifactInfo, BuildTask, BuildTaskResult, getBuildDir, getStageDir } fr
 import { removeFiles, Timer } from "./util"
 
 process.env.ORIGINAL_ELECTRON_BUILDER_TMP_DIR = process.env.ELECTRON_BUILDER_TMP_DIR
-if (process.env.ELECTRON_BUILDER_REMOVE_STAGE_EVEN_IF_DEBUG == null) {
-  process.env.ELECTRON_BUILDER_REMOVE_STAGE_EVEN_IF_DEBUG = "true"
+if (process.env.BUILDER_REMOVE_STAGE_EVEN_IF_DEBUG == null) {
+  process.env.BUILDER_REMOVE_STAGE_EVEN_IF_DEBUG = "true"
 }
 
 export default async function processor(job: Job): Promise<BuildTaskResult> {
@@ -89,7 +89,7 @@ export default async function processor(job: Job): Promise<BuildTaskResult> {
   const dirToEarlyCleanup: Array<string> = [prepackaged, projectTempDir, infoFile]
 
   function cleanup() {
-    if (process.env.ELECTRON_BUILDER_REMOVE_STAGE_EVEN_IF_DEBUG === "false") {
+    if (process.env.BUILDER_REMOVE_STAGE_EVEN_IF_DEBUG === "false") {
       return
     }
 

@@ -23,7 +23,7 @@ RUN yarn compile && \
 # have to use ubuntu instead of alpine as a base because of snapcraft
 FROM buildpack-deps:xenial-curl
 
-ENV NODE_VERSION 8.9.4
+ENV NODE_VERSION 8.11.1
 
 ENV LANG C.UTF-8
 ENV LANGUAGE C.UTF-8

@@ -1,8 +1,8 @@
 configs:
-  router-nginx.conf.v1:
+  router-nginx.conf.v2:
     external: true
 secrets:
-  builder.crt.v1:
+  builder.crt.v2:
     external: true
   builder.key.v1:
     external: true
@@ -19,7 +19,7 @@ services:
       DEBUG: null
       REDIS_ENDPOINT: null
     hostname: '{{.Node.ID}}-{{.Service.Name}}'
-    image: electronuserland/build-server-router@sha256:69ac55c869b8a8f4144fabf16131a9e01ba961061d49e51859e173a4a7b6f0ef
+    image: electronuserland/build-server-router@sha256:ed9bbb03cecebe7068d94d8071c89611bc975433570591bd3f788917b76be1eb
     logging:
       driver: json-file
       options:
@@ -32,7 +32,7 @@ services:
     - socket:/socket:rw
   router-nginx:
     configs:
-    - source: router-nginx.conf.v1
+    - source: router-nginx.conf.v2
       target: /etc/nginx/nginx.conf
     deploy:
       endpoint_mode: dnsrr
@@ -51,7 +51,7 @@ services:
       published: 443
       target: 443
     secrets:
-    - source: builder.crt.v1
+    - source: builder.crt.v2
       target: bundle.crt
     - source: builder.key.v1
       target: node.key

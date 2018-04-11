@@ -32,10 +32,10 @@ services:
         published: 8444
         mode: host
     configs:
-      - source: router-nginx.conf.v1
+      - source: router-nginx.conf.v2
         target: /etc/nginx/nginx.conf
     secrets:
-      - source: builder.crt.v1
+      - source: builder.crt.v2
         target: bundle.crt
       - source: builder.key.v1
         target: node.key
@@ -51,11 +51,11 @@ volumes:
   socket:
 
 configs:
-  router-nginx.conf.v1:
+  router-nginx.conf.v2:
     external: true
 
 secrets:
-  builder.crt.v1:
+  builder.crt.v2:
     external: true
   builder.key.v1:
     external: true

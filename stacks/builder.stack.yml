@@ -2,7 +2,7 @@ configs:
   nginx.conf.v7:
     external: true
 secrets:
-  builder.crt.v1:
+  builder.crt.v2:
     external: true
   builder.key.v1:
     external: true
@@ -21,7 +21,7 @@ services:
       ELECTRON_BUILDER_TMP_DIR: /builder-tmp
       REDIS_ENDPOINT: null
     hostname: '{{.Node.ID}}-{{.Service.Name}}'
-    image: 'electronuserland/build-server@sha256:7480ff9495ce28e9a896212875272043e3535f8ce0b7a7d9ccce25b6590c6d16'
+    image: 'electronuserland/build-server@sha256:b179353050de0eb902507c43ad28f14654683d002d3b96f2178500b6e4388335'
     logging:
       driver: json-file
       options:
@@ -63,7 +63,7 @@ services:
         published: 443
         target: 443
     secrets:
-      - source: builder.crt.v1
+      - source: builder.crt.v2
         target: bundle.crt
       - source: builder.key.v1
         target: node.key

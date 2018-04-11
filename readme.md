@@ -37,8 +37,7 @@ To disable using Electron Build Service set option `remoteBuild: false` in the [
 
 ### Server Locations
 
-* Europe — Amsterdam, Frankfurt and London.
-* USA — Dallas.
+* Europe — Amsterdam and Frankfurt.
 * Canada — Beauharnois.
 
 Which build server will be used is not predictable. Your actual location is not used for now to select build server, but planned (by IP address).

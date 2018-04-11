@@ -35,7 +35,7 @@ services:
     command: ["/bin/sh", "-c", "rm -f /socket/nginx.socket && /start.sh -g 'daemon off;'"]
     hostname: "{{.Node.ID}}-{{.Service.Name}}"
     secrets:
-      - source: builder.crt.v1
+      - source: builder.crt.v2
         target: bundle.crt
       - source: builder.key.v1
         target: node.key
@@ -55,7 +55,7 @@ volumes:
   socket:
 
 secrets:
-  builder.crt.v1:
+  builder.crt.v2:
     external: true
   builder.key.v1:
     external: true

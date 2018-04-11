@@ -8,7 +8,7 @@
   "dependencies": {
     "async-exit-hook": "^2.0.1",
     "ioredis": "^3.2.2",
-    "needle": "^2.1.1"
+    "needle": "^2.2.0"
   },
   "devDependencies": {
     "@types/needle": "^2.0.2"
