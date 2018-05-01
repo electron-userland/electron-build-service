@@ -22,7 +22,7 @@
   ],
   "devDependencies": {
     "@types/ioredis": "^3.2.7",
-    "@types/node": "^9.6.1",
+    "@types/node": "^9.6.5",
     "electron-builder-tslint-config": "^1.1.0",
     "js-yaml": "^3.11.0",
     "tslint": "^5.9.1",

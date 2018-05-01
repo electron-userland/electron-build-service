@@ -28,7 +28,7 @@ services:
         max-size: "4m"
         max-file: "2"
     secrets:
-      - source: redis.v1
+      - source: redis.v2
         target: /run/secrets/redis
 
   nginx:
@@ -59,7 +59,7 @@ secrets:
     external: true
   builder.key.v1:
     external: true
-  redis.v1:
+  redis.v2:
     external: true
 
 configs:

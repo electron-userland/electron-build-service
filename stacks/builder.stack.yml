@@ -6,7 +6,7 @@ secrets:
     external: true
   builder.key.v1:
     external: true
-  redis.v1:
+  redis.v2:
     external: true
 services:
   builder:
@@ -21,14 +21,14 @@ services:
       ELECTRON_BUILDER_TMP_DIR: /builder-tmp
       REDIS_ENDPOINT: null
     hostname: '{{.Node.ID}}-{{.Service.Name}}'
-    image: 'electronuserland/build-server@sha256:b179353050de0eb902507c43ad28f14654683d002d3b96f2178500b6e4388335'
+    image: 'electronuserland/build-server@sha256:97fb41d8329057685b58a093dcb311879310ebb4e8893c6eec11f9fa56707637'
     logging:
       driver: json-file
       options:
         max-file: '2'
         max-size: 4m
     secrets:
-      - source: redis.v1
+      - source: redis.v2
         target: /run/secrets/redis
     volumes:
       - 'socket:/socket'

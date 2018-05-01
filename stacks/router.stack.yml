@@ -6,7 +6,7 @@ secrets:
     external: true
   builder.key.v1:
     external: true
-  redis.v1:
+  redis.v2:
     external: true
 services:
   router:
@@ -19,14 +19,14 @@ services:
       DEBUG: null
       REDIS_ENDPOINT: null
     hostname: '{{.Node.ID}}-{{.Service.Name}}'
-    image: electronuserland/build-server-router@sha256:ed9bbb03cecebe7068d94d8071c89611bc975433570591bd3f788917b76be1eb
+    image: electronuserland/build-server-router@sha256:8bbe7eb0a4ae3fb50148bc80af85a93c348aff7328589487b3d70b095a937b6d
     logging:
       driver: json-file
       options:
         max-file: '2'
         max-size: 4m
     secrets:
-    - source: redis.v1
+    - source: redis.v2
       target: /run/secrets/redis
     volumes:
     - socket:/socket:rw
