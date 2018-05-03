@@ -21,23 +21,9 @@ RUN yarn compile && \
 
 # for snapcraft we must use only <= xenial because otherwise not compatible with xenial (glib version error)
 # have to use ubuntu instead of alpine as a base because of snapcraft
-FROM buildpack-deps:xenial-curl
+FROM electronuserland/builder:latest
 
-ENV NODE_VERSION 8.11.1
-
-ENV LANG C.UTF-8
-ENV LANGUAGE C.UTF-8
-ENV LC_ALL C.UTF-8
-
-RUN apt-get -qq update && \
-  apt-get -qq dist-upgrade && \
-  apt-get -qq --no-install-recommends install unzip snapcraft rpm git && \
-  curl -L https://nodejs.org/dist/v$NODE_VERSION/node-v$NODE_VERSION-linux-x64.tar.gz | tar xz -C /usr/local --strip-components=1 && \
-  unlink /usr/local/CHANGELOG.md && unlink /usr/local/LICENSE && unlink /usr/local/README.md && \
-  curl -L https://yarnpkg.com/latest.tar.gz | tar xz -C /usr/local --strip-components=1 && \
-  curl -L https://github.com/electron-userland/electron-builder-binaries/releases/download/zstd-linux-1.3.4/zstd --output /usr/local/bin/zstd && chmod +x /usr/local/bin/zstd && \
-  apt-get -qq autoremove && \
-  apt-get -qq clean && rm -rf /var/lib/apt/lists/*
+RUN curl -L https://github.com/electron-userland/electron-builder-binaries/releases/download/zstd-linux-1.3.4/zstd --output /usr/local/bin/zstd && chmod +x /usr/local/bin/zstd
 
 WORKDIR /app
 

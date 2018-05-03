@@ -57,4 +57,4 @@ Queue waiting is not predictable for now. In the future build agents will be sta
 Build time depends on target. 
 * AppImage — 10s. 
 * deb — 70s.
-* Snap — 2-3 minutes. AppImage is a default target for electron-builder, so, for now, we are not going to fix Snap build time (it is not electron-builder issue, it is due to snapcraft tool architecture — snap build is slow on a local machine also).
+* Snap — 18s.
