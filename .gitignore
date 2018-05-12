@@ -1,6 +1,6 @@
 node_modules
-out
+out/
 .idea
 yarn-error.log
 scripts/private
-.terraform/
+vendor/

@@ -1,12 +1,94 @@
 version: "3.4"
 services:
-  nginx:
-    image: develar/nginx-pushstream
+  builder:
+    image: electronuserland/build-service-builder
+    hostname: "{{.Node.ID}}-{{.Service.Name}}"
     environment:
-      - UPSTREAM_HOST=unix:/socket/builder.socket
+      - AGENT_HOST
+      - AGENT_PORT
+      - DEBUG
+      - PREFERRED_IP_VERSION
+    ports:
+      - target: ${AGENT_PORT:-443}
+        # will be replaced to 443 for production by script due to http://github.com/moby/moby/issues/35532#issuecomment-346753307
+        published: 8444
+        # http://docs.docker.com/engine/swarm/ingress/#bypass-the-routing-mesh
+        mode: host
+    secrets: &SECRETS
+      - source: builder.crt.v2
+        target: bundle.crt
+      - source: builder.key.v1
+        target: node.key
+    volumes:
+      - type: tmpfs
+        target: /builder-tmp
+
+  router:
+    image: electronuserland/build-service-router
+    hostname: "{{.Node.ID}}-{{.Service.Name}}"
     ports:
       - target: 443
-        # will be replaced to 443 for production by script due to https://github.com/moby/moby/issues/35532#issuecomment-346753307
+        # will be replaced to 443 for production by script due to http://github.com/moby/moby/issues/35532#issuecomment-346753307
         published: 8443
-        # https://docs.docker.com/engine/swarm/ingress/#bypass-the-routing-mesh
         mode: host
+    secrets: *SECRETS
+
+  etcd-1:
+    image: quay.io/coreos/etcd:v3.3.5
+    entrypoint: /usr/local/bin/etcd
+#    secrets: *SECRETS
+    command:
+      - '--name=etcd-1'
+      - '--initial-advertise-peer-urls=http://etcd-1:2380'
+      - '--listen-peer-urls=http://0.0.0.0:2380'
+      - '--advertise-client-urls=http://0.0.0.0:2379'
+      - '--initial-cluster-token=mys3cr3tok3n'
+      - '--heartbeat-interval=250'
+      - '--election-timeout=1250'
+      - '--initial-cluster=etcd-1=http://etcd-1:2380,etcd-2=http://etcd-2:2380,etcd-3=http://etcd-3:2380'
+      - '--initial-cluster-state=new'
+#      - '--cert-file=/run/secrets/bundle.crt'
+#      - '--key-file=/run/secrets/node.key'
+#      - '--peer-auto-tls'
+  etcd-2:
+    image: quay.io/coreos/etcd:v3.3.5
+    entrypoint: /usr/local/bin/etcd
+#    secrets: *SECRETS
+    command:
+      - '--name=etcd-2'
+      - '--initial-advertise-peer-urls=http://etcd-2:2380'
+      - '--listen-peer-urls=http://0.0.0.0:2380'
+      - '--listen-client-urls=http://0.0.0.0:2379'
+      - '--advertise-client-urls=http://etcd-2:2379'
+      - '--initial-cluster-token=mys3cr3tok3n'
+      - '--heartbeat-interval=250'
+      - '--election-timeout=1250'
+      - '--initial-cluster=etcd-1=http://etcd-1:2380,etcd-2=http://etcd-2:2380,etcd-3=http://etcd-3:2380'
+      - '--initial-cluster-state=new'
+#      - '--cert-file=/run/secrets/bundle.crt'
+#      - '--key-file=/run/secrets/node.key'
+#      - '--peer-auto-tls'
+  etcd-3:
+    image: quay.io/coreos/etcd:v3.3.5
+    entrypoint: /usr/local/bin/etcd
+#    secrets: *SECRETS
+    command:
+      - '--name=etcd-3'
+      - '--initial-advertise-peer-urls=http://etcd-3:2380'
+      - '--listen-peer-urls=http://0.0.0.0:2380'
+      - '--listen-client-urls=http://0.0.0.0:2379'
+      - '--advertise-client-urls=http://etcd-3:2379'
+      - '--initial-cluster-token=mys3cr3tok3n'
+      - '--heartbeat-interval=250'
+      - '--election-timeout=1250'
+      - '--initial-cluster=etcd-1=http://etcd-1:2380,etcd-2=http://etcd-2:2380,etcd-3=http://etcd-3:2380'
+      - '--initial-cluster-state=new'
+#      - '--cert-file=/run/secrets/bundle.crt'
+#      - '--key-file=/run/secrets/node.key'
+#      - '--peer-auto-tls'
+
+secrets:
+  builder.crt.v2:
+    file: ./certs/bundle.crt
+  builder.key.v1:
+    file: ./certs/node.key

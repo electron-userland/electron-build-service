@@ -10,8 +10,6 @@ unset DEBUG
 docker-compose -f docker-compose.yml -f docker-compose.prod.yml config --resolve-image-digests > stacks/builder.stack.yml
 # https://github.com/moby/moby/issues/35532#issuecomment-346753307
 sed -i "" 's/8443/443/g' stacks/builder.stack.yml
+sed -i "" 's/8444/443/g' stacks/builder.stack.yml
 
-docker-compose -f packages/router/router-compose.yml config --resolve-image-digests > stacks/router.stack.yml
-sed -i "" 's/8444/443/g' stacks/router.stack.yml
-
-node scripts/fix-compose.js
+#node scripts/fix-compose.js

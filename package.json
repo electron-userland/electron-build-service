@@ -2,30 +2,9 @@
   "private": true,
   "license": "MIT",
   "scripts": {
-    "compile": "tsc -p packages/service-registry-redis && tsc -p packages/electron-build-server && tsc -p packages/router",
-    "////": "verdaccio",
-    "//": "REDIS_ENDPOINT and ELECTRON_BUILD_SERVICE_PORT (443 by default, so, on a local machine set to 8443) envs are required",
-    "start": "yarn compile && node out/main.js",
-    "build": "docker build -t electronuserland/build-server -f packages/electron-build-server/Dockerfile . ",
-    "build-router": "docker build -t electronuserland/build-server-router -f packages/router/Dockerfile . ",
-    "bundle": "./scripts/build-bundle.sh",
-    "push": "docker push electronuserland/build-server",
-    "push-router": "docker push electronuserland/build-server-router",
-    "start-docker": "docker run --mount type=tmpfs,destination=/tmp/ram -e ELECTRON_BUILDER_TMP_DIR=/tmp/ram -e REDIS_ENDPOINT -e DEBUG -p 8443:443 --rm electronuserland/build-server",
-    "up": "docker-compose up --abort-on-container-exit",
-    "up-prod": "docker-compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.local-prod.yml up --abort-on-container-exit",
-    "up-router": "docker-compose -f packages/router/router-compose.yml -f packages/router/router-compose.dev.yml up --abort-on-container-exit",
     "dist": "yarn build && yarn build-router && yarn push && yarn push-router && yarn bundle"
   },
-  "workspaces": [
-    "packages/*"
-  ],
-  "devDependencies": {
-    "@types/ioredis": "^3.2.7",
-    "@types/node": "^10.0.1",
-    "electron-builder-tslint-config": "^1.1.0",
-    "js-yaml": "^3.11.0",
-    "tslint": "^5.9.1",
-    "typescript": "^2.8.3"
+  "dependencies": {
+    "electron-builder-lib": "20.14.1"
   }
 }

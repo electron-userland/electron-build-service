@@ -1,6 +1,3 @@
-configs:
-  nginx.conf.v7:
-    external: true
 secrets:
   builder.crt.v2:
     external: true
@@ -15,62 +12,93 @@ services:
       mode: global
       placement:
         constraints:
-          - node.labels.builder == true
+        - node.labels.builder == true
     environment:
+      AGENT_HOST: null
+      AGENT_PORT: null
       DEBUG: null
-      ELECTRON_BUILDER_TMP_DIR: /builder-tmp
-      REDIS_ENDPOINT: null
+      PREFERRED_IP_VERSION: null
     hostname: '{{.Node.ID}}-{{.Service.Name}}'
-    image: 'electronuserland/build-server@sha256:ebf1cb350bfabb63e899dd32327de41b02b7e2f24760171c2ec54edb6da0fb2f'
-    logging:
-      driver: json-file
-      options:
-        max-file: '2'
-        max-size: 4m
-    secrets:
-      - source: redis.v2
-        target: /run/secrets/redis
-    volumes:
-      - 'socket:/socket'
-      - 'stage:/stage'
-      - type: tmpfs
-        target: /builder-tmp
-  nginx:
-    command:
-      - /bin/sh
-      - '-c'
-      - rm -f /socket/nginx.socket && /start.sh -g 'daemon off;'
-    configs:
-      - source: nginx.conf.v7
-        target: /etc/nginx/nginx.conf
-    deploy:
-      endpoint_mode: dnsrr
-      mode: global
-      placement:
-        constraints:
-          - node.labels.builder == true
-    environment:
-      UPSTREAM_HOST: 'unix:/socket/builder.socket'
-    hostname: '{{.Node.ID}}-{{.Service.Name}}'
-    image: 'develar/nginx-pushstream@sha256:2f74affd13515882e57f2e6ca7e7a7ffc4ba343b80be67c4fcce5e20c634c2da'
+    image: electronuserland/build-service-builder@sha256:a2b46193a58685a8b2b72658437b007b1b96e0dad75922fe255a6848263c18d3
     logging:
       driver: json-file
       options:
         max-file: '2'
         max-size: 4m
     ports:
-      - mode: host
-        published: 443
-        target: 443
+    - mode: host
+      published: 443
+      target: 443
     secrets:
-      - source: builder.crt.v2
-        target: bundle.crt
-      - source: builder.key.v1
-        target: node.key
+    - source: builder.crt.v2
+      target: bundle.crt
+    - source: builder.key.v1
+      target: node.key
     volumes:
-      - 'socket:/socket:rw'
-      - 'stage:/stage:rw'
+    - target: /builder-tmp
+      type: tmpfs
+  etcd-1:
+    command:
+    - --name=etcd-1
+    - --initial-advertise-peer-urls=http://etcd-1:2380
+    - --listen-peer-urls=http://0.0.0.0:2380
+    - --advertise-client-urls=http://0.0.0.0:2379
+    - --initial-cluster-token=mys3cr3tok3n
+    - --heartbeat-interval=250
+    - --election-timeout=1250
+    - --initial-cluster=etcd-1=http://etcd-1:2380,etcd-2=http://etcd-2:2380,etcd-3=http://etcd-3:2380
+    - --initial-cluster-state=new
+    entrypoint: /usr/local/bin/etcd
+    image: quay.io/coreos/etcd@sha256:75955f97f6b6ce1c6f363f50f99570bbbd87516b4212d0b3acdbd48039d51dbd
+  etcd-2:
+    command:
+    - --name=etcd-2
+    - --initial-advertise-peer-urls=http://etcd-2:2380
+    - --listen-peer-urls=http://0.0.0.0:2380
+    - --listen-client-urls=http://0.0.0.0:2379
+    - --advertise-client-urls=http://etcd-2:2379
+    - --initial-cluster-token=mys3cr3tok3n
+    - --heartbeat-interval=250
+    - --election-timeout=1250
+    - --initial-cluster=etcd-1=http://etcd-1:2380,etcd-2=http://etcd-2:2380,etcd-3=http://etcd-3:2380
+    - --initial-cluster-state=new
+    entrypoint: /usr/local/bin/etcd
+    image: quay.io/coreos/etcd@sha256:75955f97f6b6ce1c6f363f50f99570bbbd87516b4212d0b3acdbd48039d51dbd
+  etcd-3:
+    command:
+    - --name=etcd-3
+    - --initial-advertise-peer-urls=http://etcd-3:2380
+    - --listen-peer-urls=http://0.0.0.0:2380
+    - --listen-client-urls=http://0.0.0.0:2379
+    - --advertise-client-urls=http://etcd-3:2379
+    - --initial-cluster-token=mys3cr3tok3n
+    - --heartbeat-interval=250
+    - --election-timeout=1250
+    - --initial-cluster=etcd-1=http://etcd-1:2380,etcd-2=http://etcd-2:2380,etcd-3=http://etcd-3:2380
+    - --initial-cluster-state=new
+    entrypoint: /usr/local/bin/etcd
+    image: quay.io/coreos/etcd@sha256:75955f97f6b6ce1c6f363f50f99570bbbd87516b4212d0b3acdbd48039d51dbd
+  router:
+    deploy:
+      endpoint_mode: dnsrr
+      placement:
+        constraints:
+        - node.labels.admin == true
+    hostname: '{{.Node.ID}}-{{.Service.Name}}'
+    image: electronuserland/build-service-router@sha256:b0743d719a4b4d8ab4f0cb65bb96dac3c97b9d98ee06691edfc0152a043c8224
+    logging:
+      driver: json-file
+      options:
+        max-file: '2'
+        max-size: 4m
+    ports:
+    - mode: host
+      published: 443
+      target: 443
+    secrets:
+    - source: builder.crt.v2
+      target: bundle.crt
+    - source: builder.key.v1
+      target: node.key
 version: '3.4'
-volumes:
-  socket: {}
-  stage: {}
+

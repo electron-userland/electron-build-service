@@ -3,7 +3,7 @@ set -e
 
 # at this moment cloud config is not applied yet, so, /etc/coreos/update.conf should be modified here
 cat <<EOF >/etc/coreos/update.conf
-GROUP=alpha
+GROUP=beta
 REBOOT_STRATEGY=off
 EOF
 
