@@ -27,7 +27,7 @@ type AgentRegistry struct {
 }
 
 func NewAgentRegistry(logger *zap.Logger) (*AgentRegistry, error) {
-  store, err := internal.CreateEtcdClient()
+  store, err := internal.CreateEtcdClient(logger)
   if err != nil {
     return nil, errors.WithStack(err)
   }

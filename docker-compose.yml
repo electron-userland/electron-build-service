@@ -36,6 +36,8 @@ services:
   etcd-1:
     image: quay.io/coreos/etcd:v3.3.5
     entrypoint: /usr/local/bin/etcd
+    deploy:
+      endpoint_mode: dnsrr
 #    secrets: *SECRETS
     command:
       - '--name=etcd-1'
@@ -53,6 +55,8 @@ services:
   etcd-2:
     image: quay.io/coreos/etcd:v3.3.5
     entrypoint: /usr/local/bin/etcd
+    deploy:
+      endpoint_mode: dnsrr
 #    secrets: *SECRETS
     command:
       - '--name=etcd-2'
@@ -71,6 +75,8 @@ services:
   etcd-3:
     image: quay.io/coreos/etcd:v3.3.5
     entrypoint: /usr/local/bin/etcd
+    deploy:
+      endpoint_mode: dnsrr
 #    secrets: *SECRETS
     command:
       - '--name=etcd-3'

@@ -18,6 +18,17 @@ func MapAsyncConcurrency(taskCount int, concurrency int, logger *zap.Logger, tas
 
   logger.Debug("map async", zap.Int("taskCount", taskCount))
 
+  if taskCount == 1 {
+    task, err := taskProducer(0)
+    if err != nil {
+      return errors.WithStack(err)
+    }
+    if task != nil {
+      return errors.WithStack(task())
+    }
+    return nil
+  }
+
   errorChannel := make(chan error)
   doneChannel := make(chan bool, taskCount)
   quitChannel := make(chan bool)

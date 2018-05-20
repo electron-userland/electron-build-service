@@ -5,6 +5,6 @@
     "dist": "yarn build && yarn build-router && yarn push && yarn push-router && yarn bundle"
   },
   "dependencies": {
-    "electron-builder-lib": "20.14.1"
+    "electron-builder-lib": "20.14.7"
   }
 }

@@ -10,9 +10,10 @@ import (
   "time"
 
     "github.com/develar/errors"
-    "github.com/electronuserland/electron-build-service/internal/agentRegistry"
+  "github.com/electronuserland/electron-build-service/internal"
+  "github.com/electronuserland/electron-build-service/internal/agentRegistry"
   "github.com/json-iterator/go"
-    "github.com/mongodb/amboy"
+  "github.com/mongodb/amboy"
   "github.com/mongodb/amboy/job"
   "github.com/segmentio/ksuid"
   "github.com/tomasen/realip"
@@ -27,12 +28,15 @@ type BuildHandler struct {
 
   stageDir string
   tmpDir   string
+
+  zstdPath string
 }
 
 func (t *BuildHandler) HandleBuildRequest(w http.ResponseWriter, r *http.Request) {
+  logger := t.logger
   if r.Method != "POST" {
     errorMessage := "only POST supported"
-    t.logger.Warn(errorMessage, zap.String("ip", realip.FromRequest(r)))
+    logger.Warn(errorMessage, zap.String("ip", realip.FromRequest(r)))
     http.Error(w, errorMessage, http.StatusMethodNotAllowed)
     return
   }
@@ -40,7 +44,7 @@ func (t *BuildHandler) HandleBuildRequest(w http.ResponseWriter, r *http.Request
   rawRequest := r.Header.Get("x-build-request")
   if rawRequest == "" {
     errorMessage := "header x-build-request is not specified"
-    t.logger.Warn(errorMessage, zap.String("ip", realip.FromRequest(r)))
+    logger.Warn(errorMessage, zap.String("ip", realip.FromRequest(r)))
     http.Error(w, errorMessage, http.StatusBadRequest)
     return
   }
@@ -49,7 +53,7 @@ func (t *BuildHandler) HandleBuildRequest(w http.ResponseWriter, r *http.Request
   err := jsoniter.UnmarshalFromString(rawRequest, &buildRequest)
   if err != nil {
     errorMessage := "cannot parse build request"
-    t.logger.Warn(errorMessage, zap.Error(err), zap.String("ip", realip.FromRequest(r)))
+    logger.Warn(errorMessage, zap.Error(err), zap.String("ip", realip.FromRequest(r)))
     http.Error(w, errorMessage+": "+err.Error(), http.StatusBadRequest)
     return
   }
@@ -69,43 +73,46 @@ func (t *BuildHandler) HandleBuildRequest(w http.ResponseWriter, r *http.Request
 
     messages: make(chan string),
     complete: make(chan BuildJobResult),
+
+    logger: logger.With(zap.String("jobId", jobId)),
   }
 
   err = t.doBuild(w, r, buildJob)
   if err != nil {
-    t.logger.Error("error", zap.Error(err))
+    logger.Error("error", zap.Error(err))
     http.Error(w, "internal server error", http.StatusInternalServerError)
     return
   }
 }
 
-func (t *BuildHandler) cleanUpAfterJobComplete(projectDir string) {
+func (t *BuildHandler) cleanUpAfterJobComplete(projectDir string, logger *zap.Logger) {
   t.updateAgentInfo(0)
-  removeFileAndLog(t.logger, projectDir)
+  removeFileAndLog(logger, projectDir)
 }
 
-func (t *BuildHandler) doBuild(w io.Writer, r *http.Request, buildJob *BuildJob) error {
+func (t *BuildHandler) doBuild(w http.ResponseWriter, r *http.Request, buildJob *BuildJob) error {
   projectDir := buildJob.projectDir
   err := os.Mkdir(projectDir, 0700)
   if err != nil {
     return errors.WithStack(err)
   }
 
+  logger := buildJob.logger
+
   t.updateAgentInfo(1)
   defer func() {
-    go t.cleanUpAfterJobComplete(projectDir)
+    go t.cleanUpAfterJobComplete(projectDir, logger)
   }()
 
   start := time.Now()
-  err = unpackTarZstd(r.Body, projectDir, t.logger)
+  err = t.unpackTarZstd(http.MaxBytesReader(w, r.Body, 768*1024*1024), projectDir, logger)
   if err != nil {
-    return errors.WithStack(err)
+    return err
   }
 
   elapsed := time.Since(start)
   jobId := buildJob.Base.TaskID
-  t.logger.Info("uploaded and unpacked",
-    zap.String("job id", jobId),
+  logger.Info("uploaded and unpacked",
     zap.Duration("elapsed", elapsed),
     zap.String("compression level", r.Header.Get("x-zstd-compression-level")),
   )
@@ -132,15 +139,15 @@ func (t *BuildHandler) doBuild(w io.Writer, r *http.Request, buildJob *BuildJob)
     return errors.New("cannot cast to AbortableRunner")
   }
 
-  jsonWriter := jsoniter.NewStream(jsoniter.ConfigDefault, w, 8*1024)
+  jsonWriter := jsoniter.NewStream(jsoniter.ConfigDefault, w, 16*1024)
 
   flushJsonWriter := func() error {
     err := jsonWriter.Flush()
     if err != nil {
-      t.logger.Error("abort job on message write error", zap.String("jobId", jobId))
+      logger.Error("abort job on message write error")
       abortErr := runner.Abort(jobId)
       if abortErr != nil {
-        t.logger.Error("cannot abort job", zap.String("jobId", jobId), zap.Error(abortErr))
+        logger.Error("cannot abort job", zap.Error(abortErr))
       }
       return err
     }
@@ -153,7 +160,7 @@ func (t *BuildHandler) doBuild(w io.Writer, r *http.Request, buildJob *BuildJob)
   for {
     select {
     case <-closeChannel:
-      t.logger.Info("client closed connection", zap.String("jobId", jobId))
+      logger.Info("client closed connection")
       if !isCompleted {
         err = runner.Abort(jobId)
         if err != nil {
@@ -175,7 +182,7 @@ func (t *BuildHandler) doBuild(w io.Writer, r *http.Request, buildJob *BuildJob)
 
     case result := <-buildJob.complete:
       isCompleted = true
-      t.logger.Debug("complete received", zap.String("jobId", jobId), zap.Error(result.error))
+      logger.Debug("complete received", zap.Error(result.error))
       if result.error != nil {
         return err
       }
@@ -235,8 +242,9 @@ func (t *BuildHandler) writeResultInfo(result *BuildJobResult, jobId string, jso
   jsonWriter.WriteObjectEnd()
 }
 
-func unpackTarZstd(reader io.Reader, unpackDir string, logger *zap.Logger) error {
-  command := exec.Command("tar", "--use-compress-program=zstd", "-x", "-C", unpackDir)
+func (t *BuildHandler) unpackTarZstd(reader io.ReadCloser, unpackDir string, logger *zap.Logger) error {
+  defer internal.Close(reader, logger)
+  command := exec.Command("tar", "--use-compress-program=" + t.zstdPath, "-x", "-C", unpackDir)
   command.Stdin = reader
 
   var errorOutput bytes.Buffer

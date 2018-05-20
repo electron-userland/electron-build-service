@@ -33,6 +33,8 @@ type BuildJob struct {
   complete chan BuildJobResult
 
   job.Base
+
+  logger *zap.Logger
 }
 
 type BuildJobResult struct {
@@ -50,7 +52,7 @@ func (t *BuildJob) Run(ctx context.Context) {
 
   jobStartTime := time.Now()
   waitTime := jobStartTime.Sub(t.queueAddTime)
-  t.handler.logger.Info("job started", zap.Duration("waitTime", waitTime))
+  t.logger.Info("job started", zap.Duration("waitTime", waitTime))
   t.messages <- fmt.Sprintf("job started (queue time: %s)", waitTime.Round(time.Millisecond))
 
   err := t.doBuild(ctx, jobStartTime)
@@ -87,9 +89,6 @@ func (t *BuildJob) doBuild(ctx context.Context, jobStartTime time.Time) error {
     "ELECTRON_BUILDER_TMP_DIR="+projectTempDir,
     // we do cleanup in any case, no need to waste nodejs worker time
     "TMP_DIR_MANAGER_ENSURE_REMOVED_ON_EXIT=false",
-    // don't want to deal with "The platform "darwin" is incompatible with this module." (because we do yarn install on macOS (developer machine, not inside docker))
-    "USE_SYSTEM_APP_BUILDER=true",
-    "USE_SYSTEM_7ZA=true",
   )
   command.Dir = t.projectDir
 
@@ -108,6 +107,11 @@ func (t *BuildJob) doBuild(ctx context.Context, jobStartTime time.Time) error {
     return errors.WithStack(err)
   }
 
+  info, err := ioutil.ReadFile(filepath.Join(t.projectDir, "info.json"))
+  if err != nil {
+    t.logger.Error("cannot write project info", zap.Error(err))
+  }
+
   result := BuildJobResult{
     rawResult: string(rawResult),
   }
@@ -124,10 +128,11 @@ func (t *BuildJob) doBuild(ctx context.Context, jobStartTime time.Time) error {
     }
   }
 
-  t.handler.logger.Info("job completed",
+  t.logger.Info("job completed",
     zap.Duration("duration", time.Since(jobStartTime)),
     zap.ByteString("result", rawResult),
     zap.Int64s("fileSizes", result.fileSizes),
+    zap.ByteString("projectInfo", info),
   )
 
   t.complete <- result
@@ -139,7 +144,7 @@ func (t *BuildJob) doBuild(ctx context.Context, jobStartTime time.Time) error {
 
 func (t *BuildJob) computeFileSizes(partialArtifactInfo []PartialArtifactInfo, projectOutDir string) ([]int64, error) {
   fileSizes := make([]int64, len(partialArtifactInfo))
-  err := internal.MapAsync(len(partialArtifactInfo), t.handler.logger, func(taskIndex int) (func() error, error) {
+  err := internal.MapAsync(len(partialArtifactInfo), t.logger, func(taskIndex int) (func() error, error) {
     file := filepath.Join(projectOutDir, partialArtifactInfo[taskIndex].File)
     return func() error {
       info, err := os.Stat(file)
@@ -159,13 +164,13 @@ type PartialArtifactInfo struct {
 }
 
 func (t *BuildJob) removeAllFilesExceptArtifacts(projectTempDir string) {
-  removeFileAndLog(t.handler.logger, projectTempDir)
+  removeFileAndLog(t.logger, projectTempDir)
 
   // on complete all project dir will be removed, but temp files are not required since now, so cleanup early because files can be on a RAM disk
   // yes, for now we expect the only target
   files, err := fsutil.ReadDirContent(t.projectDir)
   if err != nil {
-    t.handler.logger.Error("cannot remove", zap.Error(errors.WithStack(err)))
+    t.logger.Error("cannot remove", zap.Error(err))
   }
 
   for _, file := range files {
@@ -173,7 +178,7 @@ func (t *BuildJob) removeAllFilesExceptArtifacts(projectTempDir string) {
       continue
     }
 
-    removeFileAndLog(t.handler.logger, file)
+    removeFileAndLog(t.logger, file)
   }
 }
 
@@ -181,6 +186,6 @@ func removeFileAndLog(logger *zap.Logger, file string) {
   logger.Debug("remove", zap.String("file", file))
   err := os.RemoveAll(file)
   if err != nil {
-    logger.Error("cannot remove", zap.Error(errors.WithStack(err)))
+    logger.Error("cannot remove", zap.Error(err))
   }
 }

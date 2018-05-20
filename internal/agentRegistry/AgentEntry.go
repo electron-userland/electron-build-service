@@ -30,7 +30,7 @@ func computeRenewLeaseTimerDuration(ttlInSeconds int64) time.Duration {
 }
 
 func NewAgentEntry(key string, logger *zap.Logger) (*AgentEntry, error) {
-  store, err := internal.CreateEtcdClient()
+  store, err := internal.CreateEtcdClient(logger)
   if err != nil {
     return nil, errors.WithStack(err)
   }

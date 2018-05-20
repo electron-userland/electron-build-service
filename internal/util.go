@@ -28,7 +28,9 @@ func CreateHttpServerOptions(port string) *http.Server {
 }
 
 func CreateLogger() *zap.Logger {
-  logger, err := zap.NewDevelopment()
+  config := zap.NewDevelopmentConfig()
+  config.DisableCaller = true
+  logger, err := config.Build()
   if err != nil {
     log.Fatal(err)
   }

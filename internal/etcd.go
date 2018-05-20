@@ -1,15 +1,16 @@
 package internal
 
 import (
-    "crypto/x509"
+  "crypto/x509"
   "io/ioutil"
   "time"
 
   "github.com/coreos/etcd/clientv3"
   "github.com/develar/errors"
+  "go.uber.org/zap"
 )
 
-func CreateEtcdClient() (*clientv3.Client, error) {
+func CreateEtcdClient(logger *zap.Logger) (*clientv3.Client, error) {
   caBytes, err := ioutil.ReadFile("/run/secrets/bundle.crt")
   if err != nil {
     return nil, errors.WithStack(err)

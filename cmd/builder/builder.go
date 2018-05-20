@@ -6,11 +6,13 @@ import (
   "io/ioutil"
   "net/http"
   "os"
-    "runtime"
+  "path/filepath"
+  "runtime"
   "strings"
   "time"
 
   "github.com/TV4/graceful"
+  "github.com/develar/app-builder/pkg/download"
   "github.com/develar/errors"
   "github.com/develar/go-fs-util"
   "github.com/didip/tollbooth"
@@ -40,12 +42,18 @@ func start(logger *zap.Logger) error {
     return errors.WithStack(err)
   }
 
+  zstdPath, err := download.DownloadZstd(runtime.GOOS)
+  if err != nil {
+    return errors.WithStack(err)
+  }
+
   numWorkers := runtime.NumCPU() + 1
   buildHandler := &BuildHandler{
     logger:   logger,
     stageDir: string(os.PathSeparator) + "stage",
     tmpDir:   builderTmpDir,
     queue:    queue.NewLocalPriorityQueue(numWorkers),
+    zstdPath: filepath.Join(zstdPath, "zstd"),
   }
   err = buildHandler.queue.SetRunner(pool.NewAbortablePool(numWorkers, buildHandler.queue))
   if err != nil {
@@ -97,6 +105,7 @@ func start(logger *zap.Logger) error {
     zap.String("stage dir", buildHandler.stageDir),
     zap.String("temp dir", buildHandler.tmpDir),
     zap.String("etcdKey", agentEntry.Key),
+    zap.String("zstdPath", buildHandler.zstdPath),
   )
   graceful.ListenAndServeTLS(internal.CreateHttpServerOptions(port), "/run/secrets/bundle.crt", "/run/secrets/node.key")
   logger.Info("stopped")
