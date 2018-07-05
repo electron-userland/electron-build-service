@@ -1,8 +1,7 @@
 package main
 
 import (
-  "context"
-  "fmt"
+    "fmt"
   "io/ioutil"
   "net/http"
   "os"
@@ -11,19 +10,13 @@ import (
   "strings"
   "time"
 
-  "github.com/TV4/graceful"
-  "github.com/develar/app-builder/pkg/download"
+    "github.com/develar/app-builder/pkg/download"
   "github.com/develar/errors"
-  "github.com/develar/go-fs-util"
-  "github.com/didip/tollbooth"
+    "github.com/didip/tollbooth"
   "github.com/didip/tollbooth/limiter"
   "github.com/electronuserland/electron-build-service/internal"
-  "github.com/electronuserland/electron-build-service/internal/agentRegistry"
-  "github.com/mitchellh/go-homedir"
-  "github.com/mongodb/amboy"
-  "github.com/mongodb/amboy/pool"
-  "github.com/mongodb/amboy/queue"
-  "go.uber.org/zap"
+    "github.com/mitchellh/go-homedir"
+    "go.uber.org/zap"
 )
 
 func main() {
@@ -42,53 +35,22 @@ func start(logger *zap.Logger) error {
     return errors.WithStack(err)
   }
 
-  zstdPath, err := download.DownloadZstd(runtime.GOOS)
+  zstdPath, err := download.DownloadZstd(download.GetCurrentOs())
   if err != nil {
     return errors.WithStack(err)
   }
 
-  numWorkers := runtime.NumCPU() + 1
   buildHandler := &BuildHandler{
     logger:   logger,
     stageDir: string(os.PathSeparator) + "stage",
     tmpDir:   builderTmpDir,
-    queue:    queue.NewLocalPriorityQueue(numWorkers),
     zstdPath: filepath.Join(zstdPath, "zstd"),
   }
-  err = buildHandler.queue.SetRunner(pool.NewAbortablePool(numWorkers, buildHandler.queue))
+
+  err = buildHandler.PrepareDirs()
   if err != nil {
     return errors.WithStack(err)
   }
-  err = buildHandler.queue.Start(context.Background())
-  if err != nil {
-    return errors.WithStack(err)
-  }
-
-  defer amboy.WaitInterval(buildHandler.queue, 1*time.Second)
-
-  err = fsutil.EnsureEmptyDir(buildHandler.stageDir)
-  if err != nil {
-    return errors.WithStack(err)
-  }
-
-  err = fsutil.EnsureEmptyDir(buildHandler.tmpDir)
-  if err != nil {
-    return errors.WithStack(err)
-  }
-
-  port := internal.GetListenPort("AGENT_PORT")
-  agentKey, err := getAgentKey(port, logger)
-  if err != nil {
-    return errors.WithStack(err)
-  }
-
-  agentEntry, err := agentRegistry.NewAgentEntry("/builders/"+agentKey, logger)
-  if err != nil {
-    return errors.WithStack(err)
-  }
-
-  defer internal.Close(agentEntry, logger)
-  buildHandler.agentEntry = agentEntry
 
   buildLimit := tollbooth.NewLimiter(1, &limiter.ExpirableOptions{DefaultExpirationTTL: time.Hour})
   buildLimit.SetBurst(10)
@@ -100,15 +62,29 @@ func start(logger *zap.Logger) error {
   http.Handle("/v2/build", tollbooth.LimitFuncHandler(buildLimit, buildHandler.HandleBuildRequest))
   http.Handle(baseDownloadPath, tollbooth.LimitFuncHandler(downloadLimit, buildHandler.HandleDownloadRequest))
 
+  err = buildHandler.CreateAndStartQueue(runtime.NumCPU() + 1)
+  if err != nil {
+    return errors.WithStack(err)
+  }
+
+  port := internal.GetListenPort("BUILDER_PORT")
+  err = buildHandler.RegisterAgent(port)
+  if err != nil {
+    return errors.WithStack(err)
+  }
+
+  defer internal.Close(buildHandler.agentEntry, logger)
+  // wait until all tasks are completed (do not abort)
+  defer buildHandler.WaitTasksAreComplete()
+
   logger.Info("started",
     zap.String("port", port),
     zap.String("stage dir", buildHandler.stageDir),
     zap.String("temp dir", buildHandler.tmpDir),
-    zap.String("etcdKey", agentEntry.Key),
+    zap.String("etcdKey", buildHandler.agentEntry.Key),
     zap.String("zstdPath", buildHandler.zstdPath),
   )
-  graceful.ListenAndServeTLS(internal.CreateHttpServerOptions(port), "/run/secrets/bundle.crt", "/run/secrets/node.key")
-  logger.Info("stopped")
+  internal.ListenAndServeTLS(port, 4*time.Minute, logger)
   return nil
 }
 

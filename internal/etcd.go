@@ -1,35 +1,32 @@
 package internal
 
 import (
-  "crypto/x509"
-  "io/ioutil"
+  "os"
   "time"
 
   "github.com/coreos/etcd/clientv3"
   "github.com/develar/errors"
-  "go.uber.org/zap"
-)
+  )
 
-func CreateEtcdClient(logger *zap.Logger) (*clientv3.Client, error) {
-  caBytes, err := ioutil.ReadFile("/run/secrets/bundle.crt")
-  if err != nil {
-    return nil, errors.WithStack(err)
-  }
-
-  caCertPool := x509.NewCertPool()
-  caCertPool.AppendCertsFromPEM(caBytes)
-
+func CreateEtcdClient() (*clientv3.Client, error) {
+  // https://github.com/kubernetes/kubernetes/blob/06e3fefc2153637daa65657025794b7dc27f6f33/staging/src/k8s.io/apiserver/pkg/storage/storagebackend/factory/etcd3.go#L32-L57
+  // https://github.com/coreos/etcd/issues/9495
   client, err := clientv3.New(clientv3.Config{
-    Endpoints: []string{"http://etcd-1:2379", "http://etcd-2:2379", "http://etcd-3:2379"},
+    Endpoints: []string{getEtcdEndpoint()},
     // allow to wait when etcd container will be started
-    DialTimeout:          10 * time.Second,
-    AutoSyncInterval:     1 * time.Minute,
-    DialKeepAliveTime:    1 * time.Minute,
-    DialKeepAliveTimeout: 5 * time.Second,
-    //TLS: &tls.Config{
-    //  ServerName: "electron.build.local",
-    //  RootCAs:    caCertPool,
-    //},
+    DialKeepAliveTime:    30 * time.Second,
+    DialKeepAliveTimeout: 10 * time.Second,
   })
   return client, errors.WithStack(err)
+}
+
+func getEtcdEndpoint() string {
+  endpoint := os.Getenv("ETCD_ENDPOINT")
+  // etcd-operator creates this service discovery entry by default (https://github.com/coreos/etcd-operator/blob/master/doc/user/client_service.md),
+  // so, defaults provided for k8s (rancher), for docker env can be used to customize
+  if endpoint == "" {
+    return "http://etcd-cluster-client:2379"
+  } else {
+    return endpoint
+  }
 }

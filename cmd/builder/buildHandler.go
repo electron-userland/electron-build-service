@@ -2,34 +2,103 @@ package main
 
 import (
   "bytes"
-  "io"
+  "context"
+    "io"
   "net/http"
   "os"
   "os/exec"
   "path/filepath"
   "time"
 
-    "github.com/develar/errors"
+  "github.com/apex/log"
+  "github.com/develar/errors"
+  "github.com/develar/go-fs-util"
   "github.com/electronuserland/electron-build-service/internal"
   "github.com/electronuserland/electron-build-service/internal/agentRegistry"
   "github.com/json-iterator/go"
   "github.com/mongodb/amboy"
   "github.com/mongodb/amboy/job"
+  "github.com/mongodb/amboy/pool"
+  "github.com/mongodb/amboy/queue"
   "github.com/segmentio/ksuid"
   "github.com/tomasen/realip"
   "go.uber.org/zap"
 )
+
+const queueCompleteTimeOut = 5 * time.Minute
+const maxRequestBody = 768*1024*1024
+const jobMaxTime = 30 * time.Minute
 
 type BuildHandler struct {
   agentEntry  *agentRegistry.AgentEntry
   logger *zap.Logger
 
   queue amboy.Queue
+  runner amboy.AbortableRunner
 
   stageDir string
   tmpDir   string
 
   zstdPath string
+}
+
+func (t *BuildHandler) CreateAndStartQueue(numWorkers int) error {
+  t.queue = queue.NewLocalPriorityQueue(numWorkers)
+  t.runner = pool.NewAbortablePool(numWorkers, t.queue)
+  err := t.queue.SetRunner(t.runner)
+  if err != nil {
+    return errors.WithStack(err)
+  }
+
+  err = t.queue.Start(context.Background())
+  if err != nil {
+    return errors.WithStack(err)
+  }
+
+  return nil
+}
+
+func (t *BuildHandler) WaitTasksAreComplete() {
+  t.logger.Info("wait until all tasks are completed", zap.Duration("timeout", queueCompleteTimeOut))
+  start := time.Now()
+  timeOutContext, cancel := context.WithTimeout(context.Background(), queueCompleteTimeOut)
+  defer cancel()
+  isCompleted := amboy.WaitCtxInterval(timeOutContext, t.queue, 1*time.Second)
+  if isCompleted {
+    t.logger.Info("tasks completed", zap.Duration("duration", time.Since(start)))
+  } else {
+    log.Warn("cannot wait all uncompleted tasks, abort all")
+    t.runner.AbortAll()
+  }
+}
+
+func (t *BuildHandler) PrepareDirs() error {
+  err := fsutil.EnsureEmptyDir(t.stageDir)
+  if err != nil {
+    return errors.WithStack(err)
+  }
+
+  err = fsutil.EnsureEmptyDir(t.tmpDir)
+  if err != nil {
+    return errors.WithStack(err)
+  }
+
+  return nil
+}
+
+func (t *BuildHandler) RegisterAgent(port string) (error) {
+  agentKey, err := getAgentKey(port, t.logger)
+  if err != nil {
+    return errors.WithStack(err)
+  }
+
+  agentEntry, err := agentRegistry.NewAgentEntry("/builders/"+agentKey, t.logger)
+  if err != nil {
+    return errors.WithStack(err)
+  }
+
+  t.agentEntry = agentEntry
+  return nil
 }
 
 func (t *BuildHandler) HandleBuildRequest(w http.ResponseWriter, r *http.Request) {
@@ -62,7 +131,6 @@ func (t *BuildHandler) HandleBuildRequest(w http.ResponseWriter, r *http.Request
   buildJob := &BuildJob{
     Base: job.Base{
       TaskID:       jobId,
-      TaskTimeInfo: amboy.JobTimeInfo{MaxTime: 30 * time.Minute},
     },
 
     buildRequest: &buildRequest,
@@ -76,6 +144,7 @@ func (t *BuildHandler) HandleBuildRequest(w http.ResponseWriter, r *http.Request
 
     logger: logger.With(zap.String("jobId", jobId)),
   }
+  buildJob.UpdateTimeInfo(amboy.JobTimeInfo{MaxTime: jobMaxTime})
 
   err = t.doBuild(w, r, buildJob)
   if err != nil {
@@ -88,6 +157,23 @@ func (t *BuildHandler) HandleBuildRequest(w http.ResponseWriter, r *http.Request
 func (t *BuildHandler) cleanUpAfterJobComplete(projectDir string, logger *zap.Logger) {
   t.updateAgentInfo(0)
   removeFileAndLog(logger, projectDir)
+}
+
+func (t *BuildHandler) executeUnpackTarZstd(w http.ResponseWriter, r *http.Request, buildJob *BuildJob, projectDir string, ctx context.Context) (error) {
+  start := time.Now()
+  err := t.unpackTarZstd(http.MaxBytesReader(w, r.Body, maxRequestBody), projectDir, ctx, buildJob.logger)
+  if err != nil {
+    // do not wrap error, stack is clear
+    return err
+  }
+
+  elapsed := time.Since(start)
+  buildJob.logger.Info("uploaded and unpacked",
+    zap.Duration("elapsed", elapsed),
+    zap.String("compressionLevel", r.Header.Get("x-zstd-compression-level")),
+  )
+
+  return nil
 }
 
 func (t *BuildHandler) doBuild(w http.ResponseWriter, r *http.Request, buildJob *BuildJob) error {
@@ -104,18 +190,25 @@ func (t *BuildHandler) doBuild(w http.ResponseWriter, r *http.Request, buildJob 
     go t.cleanUpAfterJobComplete(projectDir, logger)
   }()
 
-  start := time.Now()
-  err = t.unpackTarZstd(http.MaxBytesReader(w, r.Body, 768*1024*1024), projectDir, logger)
-  if err != nil {
-    return err
+  closeNotifier, ok := w.(http.CloseNotifier)
+  if !ok {
+    return errors.New("cannot cast to CloseNotifier")
   }
+  closeChannel := closeNotifier.CloseNotify()
 
-  elapsed := time.Since(start)
-  jobId := buildJob.Base.TaskID
-  logger.Info("uploaded and unpacked",
-    zap.Duration("elapsed", elapsed),
-    zap.String("compression level", r.Header.Get("x-zstd-compression-level")),
-  )
+  unpackContext, cancelUnpack := context.WithCancel(context.Background())
+  err = t.executeUnpackTarZstd(w, r, buildJob, projectDir, unpackContext)
+  cancelUnpack()
+  cancelUnpack = nil
+  if err != nil {
+    select {
+    case <-closeChannel:
+      logger.Debug("ignore unpack error because client closed connection")
+      return nil
+    default:
+      return err
+    }
+  }
 
   buildJob.queueAddTime = time.Now()
   err = t.queue.Put(buildJob)
@@ -123,21 +216,12 @@ func (t *BuildHandler) doBuild(w http.ResponseWriter, r *http.Request, buildJob 
     return errors.WithStack(err)
   }
 
-  closeNotifier, ok := w.(http.CloseNotifier)
-  if !ok {
-    return errors.New("cannot cast to CloseNotifier")
-  }
-  closeChannel := closeNotifier.CloseNotify()
-
   flusher, ok := w.(http.Flusher)
   if !ok {
     return errors.New("cannot cast to Flusher")
   }
 
-  runner, ok := t.queue.Runner().(amboy.AbortableRunner)
-  if !ok {
-    return errors.New("cannot cast to AbortableRunner")
-  }
+  jobId := buildJob.Base.TaskID
 
   jsonWriter := jsoniter.NewStream(jsoniter.ConfigDefault, w, 16*1024)
 
@@ -145,7 +229,7 @@ func (t *BuildHandler) doBuild(w http.ResponseWriter, r *http.Request, buildJob 
     err := jsonWriter.Flush()
     if err != nil {
       logger.Error("abort job on message write error")
-      abortErr := runner.Abort(jobId)
+      abortErr := t.runner.Abort(jobId)
       if abortErr != nil {
         logger.Error("cannot abort job", zap.Error(abortErr))
       }
@@ -160,9 +244,19 @@ func (t *BuildHandler) doBuild(w http.ResponseWriter, r *http.Request, buildJob 
   for {
     select {
     case <-closeChannel:
-      logger.Info("client closed connection")
+      logger.Debug("client closed connection")
       if !isCompleted {
-        err = runner.Abort(jobId)
+        if cancelUnpack != nil {
+          cancelUnpack()
+        }
+        err = t.runner.Abort(jobId)
+
+        // https://jira.mongodb.org/browse/MAKE-425
+        if !buildJob.Status().Completed {
+          buildJob.MarkComplete()
+          t.queue.Complete(context.Background(), buildJob)
+        }
+
         if err != nil {
           return errors.WithStack(err)
         }
@@ -200,6 +294,7 @@ func (t *BuildHandler) doBuild(w http.ResponseWriter, r *http.Request, buildJob 
 
 func (t *BuildHandler) updateAgentInfo(relativeValue int) {
   queueStats := t.queue.Stats()
+  t.logger.Debug("queue stat", zap.Int("pending", queueStats.Pending), zap.Int("running", queueStats.Running))
   t.agentEntry.Update(queueStats.Pending + queueStats.Running + relativeValue /* our job */)
 }
 
@@ -242,18 +337,17 @@ func (t *BuildHandler) writeResultInfo(result *BuildJobResult, jobId string, jso
   jsonWriter.WriteObjectEnd()
 }
 
-func (t *BuildHandler) unpackTarZstd(reader io.ReadCloser, unpackDir string, logger *zap.Logger) error {
+func (t *BuildHandler) unpackTarZstd(reader io.ReadCloser, unpackDir string, ctx context.Context, logger *zap.Logger) error {
   defer internal.Close(reader, logger)
-  command := exec.Command("tar", "--use-compress-program=" + t.zstdPath, "-x", "-C", unpackDir)
+  command := exec.CommandContext(ctx, "tar", "--use-compress-program=" + t.zstdPath, "-x", "-C", unpackDir)
   command.Stdin = reader
 
   var errorOutput bytes.Buffer
   command.Stderr = &errorOutput
 
   err := command.Run()
-  if err != nil {
-    logger.Error("tar error", zap.ByteString("errorOutput", errorOutput.Bytes()))
-    return errors.WithStack(err)
+  if err != nil && ctx.Err() == nil {
+    return errors.Wrapf(err, "errorOutput: " + errorOutput.String())
   }
 
   return nil

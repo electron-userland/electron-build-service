@@ -18,7 +18,7 @@ docker: all
 	docker build -f cmd/builder/Dockerfile -t electronuserland/build-service-builder .
 	docker build -f cmd/router/Dockerfile -t electronuserland/build-service-router .
 
-push-docker:
+push-docker: docker
 	docker push electronuserland/build-service-builder
 	docker push electronuserland/build-service-router
 
@@ -27,4 +27,4 @@ bundle:
 	./scripts/build-bundle.sh
 
 dev: docker
-	AGENT_HOST=localhost AGENT_PORT=8444 docker-compose up --abort-on-container-exit --remove-orphans --renew-anon-volumes --scale etcd=3
+	AGENT_HOST=localhost AGENT_PORT=8444 docker-compose up --abort-on-container-exit --remove-orphans --renew-anon-volumes

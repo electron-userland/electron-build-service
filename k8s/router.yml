@@ -1,0 +1,78 @@
+apiVersion: apps/v1beta2
+kind: DaemonSet
+metadata:
+  name: router
+  namespace: default
+spec:
+  template:
+    metadata:
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: router
+                operator: In
+                values:
+                - "true"
+      containers:
+      - image: electronuserland/build-service-router@sha256:d13b0bf57273997534c2116b74f5df2e92d74fa637566e26eed1a90803c031d6
+        imagePullPolicy: Always
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /health-check
+            port: 443
+            scheme: HTTPS
+          initialDelaySeconds: 10
+          periodSeconds: 60
+          successThreshold: 1
+          timeoutSeconds: 2
+        name: router
+        ports:
+        - containerPort: 443
+          hostPort: 443
+          name: 443tcp4430
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /health-check
+            port: 443
+            scheme: HTTPS
+          initialDelaySeconds: 1
+          periodSeconds: 2
+          successThreshold: 2
+          timeoutSeconds: 2
+        resources: {}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities: {}
+          privileged: false
+          readOnlyRootFilesystem: false
+          runAsNonRoot: false
+        stdin: true
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        tty: true
+        volumeMounts:
+        - mountPath: /etc/secrets
+          name: tls
+          readOnly: true
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - name: tls
+        secret:
+          defaultMode: 256
+          optional: false
+          secretName: tls
+  updateStrategy:
+    rollingUpdate:
+      maxUnavailable: 1
+    type: RollingUpdate
+

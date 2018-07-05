@@ -1,9 +1,7 @@
 secrets:
-  builder.crt.v2:
+  builder.crt.v3:
     external: true
   builder.key.v1:
-    external: true
-  redis.v2:
     external: true
 services:
   builder:
@@ -18,8 +16,10 @@ services:
       AGENT_PORT: null
       DEBUG: null
       PREFERRED_IP_VERSION: null
+    extra_hosts:
+      etcd: 178.128.144.222
     hostname: '{{.Node.ID}}-{{.Service.Name}}'
-    image: electronuserland/build-service-builder@sha256:bcdeac7e07a1a410b94e1ebb8b28568a93fa8d38b583b5fbc3280ae64686293f
+    image: electronuserland/build-service-builder@sha256:0c496a789ec2e8dcadca32f5c4bea36ca06f52dfa2ab5baadb145d6b75819884
     logging:
       driver: json-file
       options:
@@ -30,60 +30,30 @@ services:
       published: 443
       target: 443
     secrets:
-    - source: builder.crt.v2
-      target: bundle.crt
+    - source: builder.crt.v3
+      target: /etc/secrets/tls.cert
     - source: builder.key.v1
-      target: node.key
+      target: /etc/secrets/tls.key
     volumes:
     - target: /builder-tmp
       type: tmpfs
-  etcd-1:
+  etcd-cluster-client:
     command:
-    - --name=etcd-1
-    - --initial-advertise-peer-urls=http://etcd-1:2380
-    - --listen-peer-urls=http://0.0.0.0:2380
-    - --advertise-client-urls=http://0.0.0.0:2379
-    - --initial-cluster-token=mys3cr3tok3n
-    - --heartbeat-interval=250
-    - --election-timeout=1250
-    - --initial-cluster=etcd-1=http://etcd-1:2380,etcd-2=http://etcd-2:2380,etcd-3=http://etcd-3:2380
-    - --initial-cluster-state=new
-    deploy:
-      endpoint_mode: dnsrr
-    entrypoint: /usr/local/bin/etcd
-    image: quay.io/coreos/etcd@sha256:75955f97f6b6ce1c6f363f50f99570bbbd87516b4212d0b3acdbd48039d51dbd
-  etcd-2:
-    command:
-    - --name=etcd-2
-    - --initial-advertise-peer-urls=http://etcd-2:2380
-    - --listen-peer-urls=http://0.0.0.0:2380
+    - --name=etcd
+    - --advertise-client-urls=http://etcd:2379
     - --listen-client-urls=http://0.0.0.0:2379
-    - --advertise-client-urls=http://etcd-2:2379
-    - --initial-cluster-token=mys3cr3tok3n
-    - --heartbeat-interval=250
-    - --election-timeout=1250
-    - --initial-cluster=etcd-1=http://etcd-1:2380,etcd-2=http://etcd-2:2380,etcd-3=http://etcd-3:2380
-    - --initial-cluster-state=new
     deploy:
       endpoint_mode: dnsrr
+      mode: global
+      placement:
+        constraints:
+        - node.labels.admin == true
     entrypoint: /usr/local/bin/etcd
-    image: quay.io/coreos/etcd@sha256:75955f97f6b6ce1c6f363f50f99570bbbd87516b4212d0b3acdbd48039d51dbd
-  etcd-3:
-    command:
-    - --name=etcd-3
-    - --initial-advertise-peer-urls=http://etcd-3:2380
-    - --listen-peer-urls=http://0.0.0.0:2380
-    - --listen-client-urls=http://0.0.0.0:2379
-    - --advertise-client-urls=http://etcd-3:2379
-    - --initial-cluster-token=mys3cr3tok3n
-    - --heartbeat-interval=250
-    - --election-timeout=1250
-    - --initial-cluster=etcd-1=http://etcd-1:2380,etcd-2=http://etcd-2:2380,etcd-3=http://etcd-3:2380
-    - --initial-cluster-state=new
-    deploy:
-      endpoint_mode: dnsrr
-    entrypoint: /usr/local/bin/etcd
-    image: quay.io/coreos/etcd@sha256:75955f97f6b6ce1c6f363f50f99570bbbd87516b4212d0b3acdbd48039d51dbd
+    image: gcr.io/etcd-development/etcd@sha256:87921b377d5696461975582fc8a4d2ed0b7991ad82afbc4cbe68ef383ff6c295
+    ports:
+    - mode: host
+      published: 2379
+      target: 2379
   router:
     deploy:
       endpoint_mode: dnsrr
@@ -91,7 +61,7 @@ services:
         constraints:
         - node.labels.admin == true
     hostname: '{{.Node.ID}}-{{.Service.Name}}'
-    image: electronuserland/build-service-router@sha256:fce934b34e5afccdd4eb8e00d71c84d1b4106611e3111b6f7aa172a031c27a2a
+    image: electronuserland/build-service-router@sha256:d13b0bf57273997534c2116b74f5df2e92d74fa637566e26eed1a90803c031d6
     logging:
       driver: json-file
       options:
@@ -102,9 +72,9 @@ services:
       published: 443
       target: 443
     secrets:
-    - source: builder.crt.v2
-      target: bundle.crt
+    - source: builder.crt.v3
+      target: /etc/secrets/tls.cert
     - source: builder.key.v1
-      target: node.key
+      target: /etc/secrets/tls.key
 version: '3.4'
 

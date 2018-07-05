@@ -7,6 +7,7 @@ import (
   "time"
 
   "github.com/coreos/etcd/clientv3"
+  "github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes"
   "github.com/coreos/etcd/mvcc/mvccpb"
   "github.com/develar/errors"
   "github.com/electronuserland/electron-build-service/internal"
@@ -27,7 +28,7 @@ type AgentRegistry struct {
 }
 
 func NewAgentRegistry(logger *zap.Logger) (*AgentRegistry, error) {
-  store, err := internal.CreateEtcdClient(logger)
+  store, err := internal.CreateEtcdClient()
   if err != nil {
     return nil, errors.WithStack(err)
   }
@@ -152,7 +153,11 @@ func etcdKeyToOurMapKey(keyValue *mvccpb.KeyValue) string {
 }
 
 func (t *AgentRegistry) Close() error {
-  return t.store.Close()
+  err := t.store.Close()
+  if err == rpctypes.ErrLeaseNotFound {
+    return nil
+  }
+  return err
 }
 
 type BuildAgent struct {

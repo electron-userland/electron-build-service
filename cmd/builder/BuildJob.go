@@ -61,9 +61,10 @@ func (t *BuildJob) Run(ctx context.Context) {
   }
 }
 
-func (t *BuildJob) doBuild(ctx context.Context, jobStartTime time.Time) error {
+func (t *BuildJob) doBuild(buildContext context.Context, jobStartTime time.Time) error {
   defer func() {
-    if r := recover(); r != nil {
+    r := recover()
+    if r != nil {
       t.complete <- BuildJobResult{error: errors.Errorf("recovered", r)}
     }
   }()
@@ -82,7 +83,7 @@ func (t *BuildJob) doBuild(ctx context.Context, jobStartTime time.Time) error {
     return errors.WithStack(err)
   }
 
-  command := exec.CommandContext(ctx, "node", "/node_modules/electron-builder-lib/out/remoteBuilder/builder-cli.js", *t.rawBuildRequest)
+  command := exec.CommandContext(buildContext, "node", "/node_modules/electron-builder-lib/out/remoteBuilder/builder-cli.js", *t.rawBuildRequest)
   command.Env = append(os.Environ(),
     "PROJECT_DIR="+t.projectDir,
     "PROJECT_OUT_DIR="+projectOutDir,
@@ -99,6 +100,10 @@ func (t *BuildJob) doBuild(ctx context.Context, jobStartTime time.Time) error {
 
   if err != nil {
     return errors.WithStack(err)
+  }
+
+  if buildContext.Err() != nil {
+    return buildContext.Err()
   }
 
   // reliable way to get result (since we cannot use out/err output)
@@ -183,7 +188,7 @@ func (t *BuildJob) removeAllFilesExceptArtifacts(projectTempDir string) {
 }
 
 func removeFileAndLog(logger *zap.Logger, file string) {
-  logger.Debug("remove", zap.String("file", file))
+  logger.Debug("remove file", zap.String("file", file))
   err := os.RemoveAll(file)
   if err != nil {
     logger.Error("cannot remove", zap.Error(err))

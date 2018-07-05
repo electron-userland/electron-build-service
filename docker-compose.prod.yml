@@ -2,13 +2,6 @@ version: "3.4"
 # As soon as will be released next stable docker version after 17.09, .Node.ID should be replaced to .Node.Hostname
 services:
   builder:
-    deploy:
-      # should be the only container per node
-      mode: global
-      endpoint_mode: dnsrr
-      placement:
-        constraints:
-          - node.labels.builder == true
     logging: &LOGGING
       driver: json-file
       options:
@@ -16,18 +9,10 @@ services:
         max-file: "2"
 
   router:
-    deploy:
-      # docker swarm shows error if some other container has `port mode: host` Swarm should handle this situation, but as workaround for now, just use dnsrr
-      endpoint_mode: dnsrr
-      placement:
-        constraints:
-          - node.labels.admin == true
     logging: *LOGGING
 
 secrets:
-  builder.crt.v2:
+  builder.crt.v3:
     external: true
   builder.key.v1:
-    external: true
-  redis.v2:
     external: true

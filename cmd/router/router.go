@@ -2,11 +2,10 @@ package main
 
 import (
   "fmt"
-    "net/http"
+  "net/http"
   "sort"
   "time"
 
-  "github.com/TV4/graceful"
   "github.com/develar/errors"
   "github.com/didip/tollbooth"
   "github.com/didip/tollbooth/limiter"
@@ -90,9 +89,9 @@ func start(logger *zap.Logger) error {
     logger:        logger,
   }))
 
-  port := internal.GetListenPort("ELECTRON_BUILD_SERVICE_ROUTER_PORT")
+  port := internal.GetListenPort("ROUTER_PORT")
   logger.Info("started", zap.String("port", port))
-  graceful.ListenAndServeTLS(internal.CreateHttpServerOptions(port), "/run/secrets/bundle.crt", "/run/secrets/node.key")
+  internal.ListenAndServeTLS(port, 5 * time.Second, logger)
   logger.Info("stopped")
   return nil
 }

@@ -1,8 +1,28 @@
 version: "3.4"
 services:
+  # etcd doesn't support swarm and etcd cluster setup is complex and not simple, in any case, single is enough (no need to store data)
+  etcd-cluster-client:
+    image: gcr.io/etcd-development/etcd:v3.3.8
+    command:
+    - --name=etcd
+    - --advertise-client-urls=http://etcd:2379
+    - --listen-client-urls=http://0.0.0.0:2379
+    entrypoint: /usr/local/bin/etcd
+    ports:
+      - target: 2379
+        published: 2379
+        mode: host
+    deploy:
+      endpoint_mode: dnsrr
+      mode: global
+      placement:
+        constraints:
+          - node.labels.admin == true
   builder:
     image: electronuserland/build-service-builder
     hostname: "{{.Node.ID}}-{{.Service.Name}}"
+    extra_hosts:
+    - "etcd:178.128.144.222"
     environment:
       - AGENT_HOST
       - AGENT_PORT
@@ -15,13 +35,22 @@ services:
         # http://docs.docker.com/engine/swarm/ingress/#bypass-the-routing-mesh
         mode: host
     secrets: &SECRETS
-      - source: builder.crt.v2
-        target: bundle.crt
+      # /etc/secrets instead of default /run/secrets because /run/secrets leads to unclear error on k8s (rancher)
+      # tls.* names according to traefik/k8s nginx ingress controllers
+      - source: builder.crt.v3
+        target: /etc/secrets/tls.cert
       - source: builder.key.v1
-        target: node.key
+        target: /etc/secrets/tls.key
     volumes:
       - type: tmpfs
         target: /builder-tmp
+    deploy:
+      endpoint_mode: dnsrr
+      # should be the only container per node
+      mode: global
+      placement:
+        constraints:
+          - node.labels.builder == true
 
   router:
     image: electronuserland/build-service-router
@@ -32,69 +61,15 @@ services:
         published: 8443
         mode: host
     secrets: *SECRETS
-
-  etcd-1:
-    image: quay.io/coreos/etcd:v3.3.5
-    entrypoint: /usr/local/bin/etcd
     deploy:
+      # docker swarm shows error if some other container has `port mode: host` Swarm should handle this situation, but as workaround for now, just use dnsrr
       endpoint_mode: dnsrr
-#    secrets: *SECRETS
-    command:
-      - '--name=etcd-1'
-      - '--initial-advertise-peer-urls=http://etcd-1:2380'
-      - '--listen-peer-urls=http://0.0.0.0:2380'
-      - '--advertise-client-urls=http://0.0.0.0:2379'
-      - '--initial-cluster-token=mys3cr3tok3n'
-      - '--heartbeat-interval=250'
-      - '--election-timeout=1250'
-      - '--initial-cluster=etcd-1=http://etcd-1:2380,etcd-2=http://etcd-2:2380,etcd-3=http://etcd-3:2380'
-      - '--initial-cluster-state=new'
-#      - '--cert-file=/run/secrets/bundle.crt'
-#      - '--key-file=/run/secrets/node.key'
-#      - '--peer-auto-tls'
-  etcd-2:
-    image: quay.io/coreos/etcd:v3.3.5
-    entrypoint: /usr/local/bin/etcd
-    deploy:
-      endpoint_mode: dnsrr
-#    secrets: *SECRETS
-    command:
-      - '--name=etcd-2'
-      - '--initial-advertise-peer-urls=http://etcd-2:2380'
-      - '--listen-peer-urls=http://0.0.0.0:2380'
-      - '--listen-client-urls=http://0.0.0.0:2379'
-      - '--advertise-client-urls=http://etcd-2:2379'
-      - '--initial-cluster-token=mys3cr3tok3n'
-      - '--heartbeat-interval=250'
-      - '--election-timeout=1250'
-      - '--initial-cluster=etcd-1=http://etcd-1:2380,etcd-2=http://etcd-2:2380,etcd-3=http://etcd-3:2380'
-      - '--initial-cluster-state=new'
-#      - '--cert-file=/run/secrets/bundle.crt'
-#      - '--key-file=/run/secrets/node.key'
-#      - '--peer-auto-tls'
-  etcd-3:
-    image: quay.io/coreos/etcd:v3.3.5
-    entrypoint: /usr/local/bin/etcd
-    deploy:
-      endpoint_mode: dnsrr
-#    secrets: *SECRETS
-    command:
-      - '--name=etcd-3'
-      - '--initial-advertise-peer-urls=http://etcd-3:2380'
-      - '--listen-peer-urls=http://0.0.0.0:2380'
-      - '--listen-client-urls=http://0.0.0.0:2379'
-      - '--advertise-client-urls=http://etcd-3:2379'
-      - '--initial-cluster-token=mys3cr3tok3n'
-      - '--heartbeat-interval=250'
-      - '--election-timeout=1250'
-      - '--initial-cluster=etcd-1=http://etcd-1:2380,etcd-2=http://etcd-2:2380,etcd-3=http://etcd-3:2380'
-      - '--initial-cluster-state=new'
-#      - '--cert-file=/run/secrets/bundle.crt'
-#      - '--key-file=/run/secrets/node.key'
-#      - '--peer-auto-tls'
+      placement:
+        constraints:
+          - node.labels.admin == true
 
 secrets:
-  builder.crt.v2:
+  builder.crt.v3:
     file: ./certs/bundle.crt
   builder.key.v1:
     file: ./certs/node.key
