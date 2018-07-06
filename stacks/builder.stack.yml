@@ -12,14 +12,12 @@ services:
         constraints:
         - node.labels.builder == true
     environment:
-      AGENT_HOST: null
-      AGENT_PORT: null
+      BUILDER_HOST: null
+      BUILDER_PORT: null
       DEBUG: null
       PREFERRED_IP_VERSION: null
-    extra_hosts:
-      etcd: 178.128.144.222
     hostname: '{{.Node.ID}}-{{.Service.Name}}'
-    image: electronuserland/build-service-builder@sha256:0c496a789ec2e8dcadca32f5c4bea36ca06f52dfa2ab5baadb145d6b75819884
+    image: electronuserland/build-service-builder@sha256:221fc912c758d45c0bec384df313396bc8c343c7f30f7d859a2a8297f119545e
     logging:
       driver: json-file
       options:
@@ -61,7 +59,7 @@ services:
         constraints:
         - node.labels.admin == true
     hostname: '{{.Node.ID}}-{{.Service.Name}}'
-    image: electronuserland/build-service-router@sha256:d13b0bf57273997534c2116b74f5df2e92d74fa637566e26eed1a90803c031d6
+    image: electronuserland/build-service-router@sha256:210041c6172e02c8eab294b69d8f34984d00b392b174572f51c8c293667409af
     logging:
       driver: json-file
       options:

@@ -21,15 +21,13 @@ services:
   builder:
     image: electronuserland/build-service-builder
     hostname: "{{.Node.ID}}-{{.Service.Name}}"
-    extra_hosts:
-    - "etcd:178.128.144.222"
     environment:
-      - AGENT_HOST
-      - AGENT_PORT
+      - BUILDER_HOST
+      - BUILDER_PORT
       - DEBUG
       - PREFERRED_IP_VERSION
     ports:
-      - target: ${AGENT_PORT:-443}
+      - target: ${BUILDER_PORT:-443}
         # will be replaced to 443 for production by script due to http://github.com/moby/moby/issues/35532#issuecomment-346753307
         published: 8444
         # http://docs.docker.com/engine/swarm/ingress/#bypass-the-routing-mesh

@@ -1,84 +1,67 @@
-apiVersion: apps/v1beta2
+---
+# must be daemon set because client downloads from server directly
+# it is possible to use special prefix for pod and use ingress but this huge complication doesn't worth, so, we just expose as host port
+apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  annotations:
-    deprecated.daemonset.template.generation: "3"
-  labels:
-    workload.user.cattle.io/workloadselector: daemonSet-default-builder
   name: builder
-  namespace: default
-  selfLink: /apis/apps/v1beta2/namespaces/default/daemonsets/builder
+  labels: &LABELS
+    app: builder
 spec:
   selector:
-    matchLabels:
-      workload.user.cattle.io/workloadselector: daemonSet-default-builder
+    matchLabels: *LABELS
   template:
     metadata:
-      annotations:
-        field.cattle.io/ports: '[[{"containerPort":443,"dnsName":"builder-hostport","hostPort":443,"kind":"HostPort","name":"443tcp4430","protocol":"TCP","sourcePort":443}]]'
-      creationTimestamp: null
-      labels:
-        workload.user.cattle.io/workloadselector: daemonSet-default-builder
+      labels: *LABELS
     spec:
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
             nodeSelectorTerms:
-            - matchExpressions:
-              - key: builder
-                operator: In
-                values:
-                - "true"
+              - matchExpressions:
+                  - key: builder
+                    operator: In
+                    values:
+                      - "true"
       containers:
-      - image: electronuserland/build-service-builder@sha256:0c496a789ec2e8dcadca32f5c4bea36ca06f52dfa2ab5baadb145d6b75819884
-        imagePullPolicy: Always
-        name: builder
-        ports:
-        - containerPort: 443
-          hostPort: 443
-          name: 443tcp4430
-          protocol: TCP
-        resources: {}
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities: {}
-          privileged: false
-          readOnlyRootFilesystem: false
-          runAsNonRoot: false
-        stdin: true
-        terminationMessagePath: /dev/termination-log
-        terminationMessagePolicy: File
-        tty: true
-        volumeMounts:
-        - mountPath: /etc/secrets
-          name: tls
-          readOnly: true
-        - mountPath: /builder-tmp
-          name: tmp
-      dnsPolicy: ClusterFirst
-      restartPolicy: Always
-      schedulerName: default-scheduler
-      securityContext: {}
-      terminationGracePeriodSeconds: 30
-      volumes:
-      - name: tls
-        secret:
-          defaultMode: 256
-          optional: false
-          secretName: tls
-      - emptyDir:
-          medium: Memory
-        name: tmp
-  updateStrategy:
-    rollingUpdate:
-      maxUnavailable: 1
-    type: RollingUpdate
-status:
-  currentNumberScheduled: 1
-  desiredNumberScheduled: 1
-  numberAvailable: 1
-  numberMisscheduled: 0
-  numberReady: 1
-  observedGeneration: 3
-  updatedNumberScheduled: 1
+        - image: electronuserland/build-service-builder@sha256:f9cca0a35e8cc0dc07fa75fb12390cc30510905cf2e23bd0d0b93f14e3ec6221
+          name: builder
+          ports:
+            - containerPort: 443
+              hostPort: 443
+          volumeMounts:
+            - mountPath: /etc/secrets
+              name: tls
+              readOnly: true
+            - mountPath: /builder-tmp
+              name: tmp
 
+          readinessProbe:
+            httpGet:
+              path: /health-check
+              port: 443
+              scheme: HTTPS
+            failureThreshold: 3
+            periodSeconds: 1
+            successThreshold: 2
+            timeoutSeconds: 1
+          livenessProbe:
+            httpGet:
+              path: /health-check
+              port: 443
+              scheme: HTTPS
+            failureThreshold: 3
+            initialDelaySeconds: 60
+            periodSeconds: 300
+            successThreshold: 1
+            timeoutSeconds: 2
+
+      # allow to complete running jobs (5 minutes)
+      terminationGracePeriodSeconds: 300
+      volumes:
+        - name: tls
+          secret:
+            secretName: tls
+        - emptyDir:
+            medium: Memory
+          name: tmp

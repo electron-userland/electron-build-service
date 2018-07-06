@@ -27,4 +27,4 @@ bundle:
 	./scripts/build-bundle.sh
 
 dev: docker
-	AGENT_HOST=localhost AGENT_PORT=8444 docker-compose up --abort-on-container-exit --remove-orphans --renew-anon-volumes
+	BUILDER_HOST=localhost BUILDER_PORT=8444 docker-compose up --abort-on-container-exit --remove-orphans --renew-anon-volumes

@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: logspout
+  labels: &LABELS
+    app: logspout
+spec:
+  selector:
+    matchLabels: *LABELS
+  template:
+    metadata:
+      labels: *LABELS
+    spec:
+      hostPID: true
+      hostIPC: true
+      hostNetwork: true
+      containers:
+        - image: gliderlabs/logspout:v3.2.5
+          name: logspout
+          env:
+            - name: SYSLOG_TAG
+              value: '{{ index .Container.Config.Labels "io.kubernetes.pod.namespace" }}[{{ index .Container.Config.Labels "io.kubernetes.pod.name" }}]'
+            - name: SYSLOG_HOSTNAME
+              value: '{{ index .Container.Config.Labels "io.kubernetes.container.name" }}'
+            - name: ROUTE_URIS
+              valueFrom:
+                secretKeyRef:
+                  name: papertrail-destination
+                  key: papertrail-destination
+          volumeMounts:
+            - name: docker-socket
+              mountPath: /var/run/docker.sock
+              readOnly: true
+      volumes:
+        - name: docker-socket
+          hostPath:
+            path: /var/run/docker.sock

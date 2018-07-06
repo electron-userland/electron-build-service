@@ -1,25 +1,29 @@
-Servers hosted on:
+Servers hosted on [OVH](https://www.ovh.ie) Cloud VPS:
 
-* [OVH](https://www.ovh.com/) — constantly running build servers.
-* [Vultr](https://www.vultr.com/?ref=7263602) — build servers on demand (reserve).
-* [UpCloud](https://www.upcloud.com/register/?promo=Z78TBU) — router and other control services. 
+* build servers.
+* router and other control services (Kubernetes).
 
-(links are [referral](https://www.upcloud.com/blog/join-our-referral-program/)).
+OVH is the only cloud provider that provides the best price/performance ration. Difference is dramatical, OVH server for 19$ is able to build snap in 1m43s vs 2m6s on DigitalOcean/Vultr/UpCloud 20$ server.
+
+Only 20$+ servers are suitable for build — build job concurrency equals to cpuCount + 1. So, for 10$ server it means that there is a chance that second job will fail with out of memory (1 vCPU and 2 GB RAM).
+
+DigitalOcean/Vultr/UpCloud has the same pricing and performance. 
+
+If you don't need superior performance (or if you agree to pay twice more, 40$ instead of 20$ for build server) and high availability, DigitalOcean is the best choice. And Rancher supports it (no need to create nodes by hand).
+
+But if you need high availability, use Vultr — because Vultr provides [BGP](https://www.vultr.com/docs/high-availability-on-vultr-with-floating-ip-and-bgp) and you can easily use [MetalLB](https://metallb.universe.tf) as a load balancer for free (OVH/DigitalOcean offers it for 20$). For build service high availability is not required because client retries connection attempts to router several times (yes, will be a problem if DNS server always returns the same server IP, but it is a tradeoff, OVH Cloud VPS is quite reliable) and router will not return unhealhy build agents.
 
 ## Scaleway
 
-Scaleway simply sucks. 
+Scaleway maybe great for general purpose sites, but not as a build server because of Atom CPU. Another problem is that only Paris location is available (Amsterdam doesn't support new Start NVMe plans).
 
-* No way to install custom OS (no iPXE or ISO support), prebuilt images are outdated, poor choice anyway (no not only RancherOS, but also CoreOS).
-* And company doesn't respond to answers and comments. There are number of public repositories, but not [maintained](https://github.com/scaleway-community/scaleway-coreos/issues/1#issuecomment-347016327) and outdated.
-* A lot of pitfalls and critical issues [without solutions](https://github.com/scaleway/image-ubuntu/issues/87) for months.
+[Rancher](https://rancher.com) instance to manage Kubernetes is hosted on Scaleway and it works great (for €7.99 you get 4 Atom CPU and 4GB RAM).
 
 ## Vultr
 
 In general, good. There are number of minor issues, that's make Vultr not so awesome compared to DigitalOcean:
 
 * Snapshot per the whole disk, as result, very slow. At least 3 minutes is required to restore (25 GB SSD). So, this feature is not usable at all, and it is more suitable just create a new server from scratch using boot script (~45 seconds).
-* Not easy to install CoreOS because at least 2 GB RAM is required, and provided image is outdated. Solution? Just install provided image and upgrade (adds ~10 seconds to setup new server).
 
 ## OVH
 
@@ -28,7 +32,8 @@ VPS Cloud.
 * No sexy UI (but UI is still fully functional and quite usable).
 * No explicit ISO or iPXE support.
 * ~3 minutes to install, then ~3 minutes to boot in Resque mode to install custom OS.
-* No hourly billing. 
+* No hourly billing.
+* 100 Mbits/s.
 
 But NVMe disks (and as result, superior performance), ability to install any OS using Resque mode. What else do you want?
 
@@ -36,11 +41,9 @@ But NVMe disks (and as result, superior performance), ability to install any OS 
 
 UpCloud is great. Really great. It is able even to gracefully shutdown server from admin panel.
 
-The only issue why it is not a winner — price. For 20$ on Vultr you will get 4 GB RAM. On UpCloud only 2 GB. Because of lzma compression, for one build task more than 1 GB RAM is required. So, UpCloud server will be twice as expensive (40$).
-
 ## DigitalOcean
 
-Well... CPU as Vultr, price and RAM as UpCloud. So, no reason to use it. Benchmark "build AppImage and deb" was not performed, because results of "build AppImage" is enough to say that UpCloud is a winner (again, Vultr offers you twice more memory for the same price).
+See above.
 
 ## Linode
 
@@ -57,5 +60,3 @@ Well, to build AppImage (gzip, not CPU hungry) and deb (CPU hungry because of xz
 Why? Because Atom CPU is slow compared to 1 vCPU on Vultr/UpCloud. Of course, xz must be not used because slow and badly implemented (not really multi-threaded), only 7z must be, but still. So, 4 Atom CPU for build task is not so good as 2 vCPU even if you use modern decent multi-cpu aware software like 7zip.
 
 So, even if Vultr costs 20$ (not 14$) and offers 4 GB RAM instead of 8 GB RAM, Vultr/OVH is a winner.
-
-Yes, UpCloud vCPU is more powerful compared to Vultr vCPU, but RAM not enough. It is a reason why Vultr 10$ plans is not used, only 20$+ — build job concurrency equals to cpuCount + 1. So, for 10$ server it means that there is a chance that second job will fail with out of memory (1 vCPU and 2 GB RAM).

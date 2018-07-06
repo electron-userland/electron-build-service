@@ -6,6 +6,7 @@ import (
   "time"
 
   "github.com/coreos/etcd/clientv3"
+  "github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes"
   "github.com/develar/errors"
   "github.com/electronuserland/electron-build-service/internal"
   "go.uber.org/zap"
@@ -26,7 +27,7 @@ type AgentEntry struct {
 
 // ttlInSeconds - is the server selected time-to-live, in seconds, for the lease
 func computeRenewLeaseTimerDuration(ttlInSeconds int64) time.Duration {
-  return time.Duration(ttlInSeconds - 5) * time.Second
+  return time.Duration(ttlInSeconds - 4 /* seconds is enough for renew */) * time.Second
 }
 
 func NewAgentEntry(key string, logger *zap.Logger) (*AgentEntry, error) {
@@ -44,6 +45,12 @@ func NewAgentEntry(key string, logger *zap.Logger) (*AgentEntry, error) {
   timer := time.NewTimer(computeRenewLeaseTimerDuration(leaseGrantResponse.TTL))
   isClosed := make(chan bool, 1)
 
+  // job count (cannot be more than 127 (actually, router limits to 16 and then returns 503 (and client retry request after at least 30 seconds)))
+  _, err = store.Put(context.Background(), key, string([]byte{byte(runtime.NumCPU()), 0}), clientv3.WithLease(leaseGrantResponse.ID))
+  if err != nil {
+    return nil, errors.WithStack(err)
+  }
+
   go func() {
     for {
       select {
@@ -52,6 +59,13 @@ func NewAgentEntry(key string, logger *zap.Logger) (*AgentEntry, error) {
       case <-timer.C:
         response, err := store.KeepAliveOnce(context.Background(), leaseGrantResponse.ID)
         if err != nil {
+          if err == rpctypes.ErrLeaseNotFound {
+            logger.Warn("cannot renew the agent entry lease", zap.String("key", key), zap.String("reason", err.Error()), zap.String("solution", "agent will be registered again"))
+            // register new
+            NewAgentEntry(key, logger)
+            return
+          }
+
           logger.Error("cannot renew the agent entry lease", zap.String("key", key), zap.Error(err))
         }
 
@@ -59,12 +73,6 @@ func NewAgentEntry(key string, logger *zap.Logger) (*AgentEntry, error) {
       }
     }
   }()
-
-  // job count (cannot be more than 127 (actually, router limits to 16 and then returns 503 (and client retry request after at least 30 seconds)))
-  _, err = store.Put(context.Background(), key, string([]byte{byte(runtime.NumCPU()), 0}), clientv3.WithLease(leaseGrantResponse.ID))
-  if err != nil {
-    return nil, errors.WithStack(err)
-  }
 
   entry := &AgentEntry{
     Key:    key,

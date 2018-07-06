@@ -8,18 +8,22 @@ import (
   "net/http"
   "os"
   "os/signal"
+  "strings"
   "syscall"
   "time"
 
+  "github.com/develar/app-builder/pkg/util"
   "go.uber.org/zap"
 )
 
 func GetListenPort(envName string) string {
   port := os.Getenv(envName)
-  if port == "" {
+  // k8s sets envs like BUILDER_SERVICE_PORT=tcp://10.43.216.215:443, so, to avoid issues, do not use such values
+  if port == "" || strings.HasPrefix(port, "tcp://") {
     return "443"
+  } else {
+    return port
   }
-  return port
 }
 
 func createHttpServerOptions(port string) *http.Server {
@@ -76,6 +80,7 @@ func shutdownHttpServer(server *http.Server, shutdownTimeout time.Duration, logg
 
 func CreateLogger() *zap.Logger {
   config := zap.NewDevelopmentConfig()
+  config.Encoding = util.GetEnvOrDefault("LOG_ENCODING", "console")
   config.DisableCaller = true
   logger, err := config.Build()
   if err != nil {

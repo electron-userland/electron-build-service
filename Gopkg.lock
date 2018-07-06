@@ -59,6 +59,12 @@
   revision = "b4b4d354a079fbf4bd948faad01b32cecb2ffe03"
 
 [[projects]]
+  branch = "master"
+  name = "github.com/buger/jsonparser"
+  packages = ["."]
+  revision = "2cac668e8456b4284edb0715e17e2af02d3ec993"
+
+[[projects]]
   name = "github.com/coreos/etcd"
   packages = [
     "auth/authpb",
@@ -83,8 +89,8 @@
     "pkg/download",
     "pkg/util"
   ]
-  revision = "0553337622c8cd12d8d5def7449003e7127282a9"
-  version = "v1.10.3"
+  revision = "9b78c4add6fd6a3ecbfe9b49d9ea859c609d2d23"
+  version = "v1.11.2"
 
 [[projects]]
   name = "github.com/develar/errors"
@@ -108,12 +114,6 @@
   ]
   revision = "c95eaa3ddc98f635a91e218b48727fb2e06613ea"
   version = "v4.0.0"
-
-[[projects]]
-  branch = "master"
-  name = "github.com/dustin/go-humanize"
-  packages = ["."]
-  revision = "02af3965c54e8cacf948b97fef38925c4120652c"
 
 [[projects]]
   name = "github.com/fatih/structs"
@@ -155,8 +155,8 @@
     "proto",
     "protoc-gen-gogo/descriptor"
   ]
-  revision = "1adfc126b41513cc696b209667c8656ea7aac67c"
-  version = "v1.0.0"
+  revision = "7d68e886eac4f7e34d0d82241a6273d6c304c5cf"
+  version = "v1.1.0"
 
 [[projects]]
   name = "github.com/golang/protobuf"
@@ -223,7 +223,7 @@
     "queue",
     "registry"
   ]
-  revision = "9a3c6b36d9baf6ee6feb49ccde3cb4d3681a4b6a"
+  revision = "a0574d2d6bc226fab607a16d1e67d64cc685259e"
 
 [[projects]]
   branch = "master"
@@ -238,7 +238,7 @@
     "slogger",
     "sometimes"
   ]
-  revision = "5d6dffc047e01c5553d48459d68a2d4f6c11a6ff"
+  revision = "0949d08c33974934e6775bb87e557c1570f8eb18"
 
 [[projects]]
   name = "github.com/mongodb/mongo-go-driver"
@@ -247,13 +247,12 @@
     "bson/builder",
     "bson/decimal",
     "bson/elements",
-    "bson/internal/jsonparser",
     "bson/objectid",
     "bson/parser",
     "bson/parser/ast"
   ]
-  revision = "545effea171428c3e129274032cedbf9beb0e724"
-  version = "v0.0.8"
+  revision = "4503c54ec045b406a0b3533901c6d7a5614cfef3"
+  version = "v0.0.9"
 
 [[projects]]
   name = "github.com/nutmegdevelopment/sumologic"
@@ -376,7 +375,7 @@
     "internal/timeseries",
     "trace"
   ]
-  revision = "ed29d75add3d7c4bf7ca65aac0c6df3d1420216f"
+  revision = "d0887baf81f4598189d4e12a37c6da86f0bba4d0"
 
 [[projects]]
   branch = "master"
@@ -394,7 +393,7 @@
     "unix",
     "windows"
   ]
-  revision = "151529c776cdc58ddbe7963ba9af779f3577b419"
+  revision = "ac767d655b305d4e9612f5f6e33120b9176c4ad4"
 
 [[projects]]
   name = "golang.org/x/text"
@@ -448,7 +447,7 @@
     "lapack/lapack64",
     "mat"
   ]
-  revision = "e9e56344e335b77c52738092530a60fd12db0351"
+  revision = "259c560b357132d0961f036d08e8d8ccd33c4025"
 
 [[projects]]
   name = "google.golang.org/appengine"
@@ -469,7 +468,7 @@
   branch = "master"
   name = "google.golang.org/genproto"
   packages = ["googleapis/rpc/status"]
-  revision = "ff3583edef7de132f219f0efc00e097cabcc0ec0"
+  revision = "e92b116572682a5b432ddd840aeaba2a559eeff1"
 
 [[projects]]
   name = "google.golang.org/grpc"
@@ -525,6 +524,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "b0ab978eb47ef9d45a37f7fc25e3ce30024cd17c8339decc11a5d79611071ed3"
+  inputs-digest = "4ac29d8f3c3056c3f93d923cfa614294977de25b21ca4d13c095cdf3183ad891"
   solver-name = "gps-cdcl"
   solver-version = 1

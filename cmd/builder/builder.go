@@ -114,10 +114,10 @@ func getAgentKey(port string, logger *zap.Logger) (string, error) {
   return ip + ":" + port, nil
 }
 
-// todo is it really required
 func getExternalPublicIp(logger *zap.Logger) (string, error) {
-  explicit := os.Getenv("AGENT_HOST")
+  explicit := os.Getenv("BUILDER_HOST")
   if explicit != "" {
+    logger.Debug("host specified explicitly via env", zap.String("host", explicit))
     return explicit, nil
   }
 

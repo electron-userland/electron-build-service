@@ -68,7 +68,7 @@ func (t *BuildHandler) WaitTasksAreComplete() {
     t.logger.Info("tasks completed", zap.Duration("duration", time.Since(start)))
   } else {
     log.Warn("cannot wait all uncompleted tasks, abort all")
-    t.runner.AbortAll()
+    t.runner.AbortAll(context.Background())
   }
 }
 
@@ -223,13 +223,14 @@ func (t *BuildHandler) doBuild(w http.ResponseWriter, r *http.Request, buildJob 
 
   jobId := buildJob.Base.TaskID
 
-  jsonWriter := jsoniter.NewStream(jsoniter.ConfigDefault, w, 16*1024)
+  jsonWriter := jsoniter.NewStream(jsoniter.ConfigFastest, w, 16*1024)
 
   flushJsonWriter := func() error {
+    jsonWriter.WriteRaw("\n")
     err := jsonWriter.Flush()
     if err != nil {
       logger.Error("abort job on message write error")
-      abortErr := t.runner.Abort(jobId)
+      abortErr := t.runner.Abort(context.Background(), jobId)
       if abortErr != nil {
         logger.Error("cannot abort job", zap.Error(abortErr))
       }
@@ -249,14 +250,8 @@ func (t *BuildHandler) doBuild(w http.ResponseWriter, r *http.Request, buildJob 
         if cancelUnpack != nil {
           cancelUnpack()
         }
-        err = t.runner.Abort(jobId)
 
-        // https://jira.mongodb.org/browse/MAKE-425
-        if !buildJob.Status().Completed {
-          buildJob.MarkComplete()
-          t.queue.Complete(context.Background(), buildJob)
-        }
-
+        err = t.runner.Abort(context.Background(), jobId)
         if err != nil {
           return errors.WithStack(err)
         }
