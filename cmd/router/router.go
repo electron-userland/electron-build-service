@@ -91,8 +91,7 @@ func start(logger *zap.Logger) error {
 
   port := internal.GetListenPort("ROUTER_PORT")
   logger.Info("started", zap.String("port", port))
-  internal.ListenAndServeTLS(port, 5 * time.Second, logger)
-  logger.Info("stopped")
+  internal.ListenAndServeTLS(port, 5 * time.Second, nil, logger)
   return nil
 }
 

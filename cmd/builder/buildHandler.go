@@ -8,6 +8,7 @@ import (
   "os"
   "os/exec"
   "path/filepath"
+  "strings"
   "time"
 
   "github.com/apex/log"
@@ -63,7 +64,7 @@ func (t *BuildHandler) WaitTasksAreComplete() {
   start := time.Now()
   timeOutContext, cancel := context.WithTimeout(context.Background(), queueCompleteTimeOut)
   defer cancel()
-  isCompleted := amboy.WaitCtxInterval(timeOutContext, t.queue, 1*time.Second)
+  isCompleted := amboy.WaitCtxInterval(timeOutContext, t.queue, 2*time.Second)
   if isCompleted {
     t.logger.Info("tasks completed", zap.Duration("duration", time.Since(start)))
   } else {
@@ -241,29 +242,43 @@ func (t *BuildHandler) doBuild(w http.ResponseWriter, r *http.Request, buildJob 
     return nil
   }
 
+  ticker := time.NewTicker(30 * time.Second)
+  defer ticker.Stop()
+
   isCompleted := false
   for {
     select {
     case <-closeChannel:
       logger.Debug("client closed connection")
       if !isCompleted {
+        isCompleted = true
         if cancelUnpack != nil {
           cancelUnpack()
         }
 
         err = t.runner.Abort(context.Background(), jobId)
         if err != nil {
-          return errors.WithStack(err)
+          if strings.Contains(err.Error(), "is not defined") {
+            t.queue.Complete(context.Background(), buildJob)
+          } else {
+            return errors.WithStack(err)
+          }
         }
       }
       return nil
 
+    case <-ticker.C:
+      // as ping messages to ensure that connection will be not closed
+      jsonWriter.Reset(w)
+      writeStatus("build in progress...", jsonWriter)
+      err = flushJsonWriter()
+      if err != nil {
+        logger.Error("cannot write ping message", zap.Error(err))
+      }
+
     case message := <-buildJob.messages:
       jsonWriter.Reset(w)
-      jsonWriter.WriteObjectStart()
-      jsonWriter.WriteObjectField("status")
-      jsonWriter.WriteString(message)
-      jsonWriter.WriteObjectEnd()
+      writeStatus(message, jsonWriter)
       err = flushJsonWriter()
       if err != nil {
         return err
@@ -277,7 +292,7 @@ func (t *BuildHandler) doBuild(w http.ResponseWriter, r *http.Request, buildJob 
       }
 
       jsonWriter.Reset(w)
-      t.writeResultInfo(&result, jobId, jsonWriter)
+      writeResultInfo(&result, jobId, jsonWriter)
       err = flushJsonWriter()
       if err != nil {
         return err
@@ -293,7 +308,14 @@ func (t *BuildHandler) updateAgentInfo(relativeValue int) {
   t.agentEntry.Update(queueStats.Pending + queueStats.Running + relativeValue /* our job */)
 }
 
-func (t *BuildHandler) writeResultInfo(result *BuildJobResult, jobId string, jsonWriter *jsoniter.Stream) {
+func writeStatus(message string, jsonWriter *jsoniter.Stream) {
+  jsonWriter.WriteObjectStart()
+  jsonWriter.WriteObjectField("status")
+  jsonWriter.WriteString(message)
+  jsonWriter.WriteObjectEnd()
+}
+
+func writeResultInfo(result *BuildJobResult, jobId string, jsonWriter *jsoniter.Stream) {
   jsonWriter.WriteObjectStart()
 
   jsonWriter.WriteObjectField("baseUrl")

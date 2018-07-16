@@ -238,7 +238,7 @@
     "slogger",
     "sometimes"
   ]
-  revision = "0949d08c33974934e6775bb87e557c1570f8eb18"
+  revision = "4e249e131f0fc6208e013106091bd2c7b366b578"
 
 [[projects]]
   name = "github.com/mongodb/mongo-go-driver"
@@ -447,7 +447,7 @@
     "lapack/lapack64",
     "mat"
   ]
-  revision = "259c560b357132d0961f036d08e8d8ccd33c4025"
+  revision = "023b8e605abb7af160043f692d4313e058bd8a5a"
 
 [[projects]]
   name = "google.golang.org/appengine"
@@ -468,7 +468,7 @@
   branch = "master"
   name = "google.golang.org/genproto"
   packages = ["googleapis/rpc/status"]
-  revision = "e92b116572682a5b432ddd840aeaba2a559eeff1"
+  revision = "c19ce6109657698453207a91afbb7b97035b5546"
 
 [[projects]]
   name = "google.golang.org/grpc"

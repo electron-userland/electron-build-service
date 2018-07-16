@@ -117,20 +117,9 @@ func (t *BuildJob) doBuild(buildContext context.Context, jobStartTime time.Time)
     t.logger.Error("cannot write project info", zap.Error(err))
   }
 
-  result := BuildJobResult{
-    rawResult: string(rawResult),
-  }
-  if len(rawResult) > 0 && rawResult[0] == '[' {
-    var partialArtifactInfo []PartialArtifactInfo
-    err = jsoniter.Unmarshal(rawResult, &partialArtifactInfo)
-    if err != nil {
-      return errors.WithStack(err)
-    }
-
-    result.fileSizes, err = t.computeFileSizes(partialArtifactInfo, projectOutDir)
-    if err != nil {
-      return errors.WithStack(err)
-    }
+  result, err := t.processResult(rawResult, projectOutDir)
+  if err != nil {
+    return err
   }
 
   t.logger.Info("job completed",
@@ -140,11 +129,32 @@ func (t *BuildJob) doBuild(buildContext context.Context, jobStartTime time.Time)
     zap.ByteString("projectInfo", info),
   )
 
-  t.complete <- result
+  t.complete <- *result
 
   go t.removeAllFilesExceptArtifacts(projectTempDir)
 
   return nil
+}
+
+func (t *BuildJob) processResult(rawResult []byte, projectOutDir string) (*BuildJobResult, error) {
+  result := &BuildJobResult{
+    rawResult: string(rawResult),
+  }
+
+  if len(rawResult) > 0 && rawResult[0] == '[' {
+    var partialArtifactInfo []PartialArtifactInfo
+    err := jsoniter.Unmarshal(rawResult, &partialArtifactInfo)
+    if err != nil {
+      return nil, errors.WithStack(err)
+    }
+
+    result.fileSizes, err = t.computeFileSizes(partialArtifactInfo, projectOutDir)
+    if err != nil {
+      return nil, errors.WithStack(err)
+    }
+  }
+
+  return result, nil
 }
 
 func (t *BuildJob) computeFileSizes(partialArtifactInfo []PartialArtifactInfo, projectOutDir string) ([]int64, error) {

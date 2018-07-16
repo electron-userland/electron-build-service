@@ -73,10 +73,6 @@ func start(logger *zap.Logger) error {
     return errors.WithStack(err)
   }
 
-  defer internal.Close(buildHandler.agentEntry, logger)
-  // wait until all tasks are completed (do not abort)
-  defer buildHandler.WaitTasksAreComplete()
-
   logger.Info("started",
     zap.String("port", port),
     zap.String("stage dir", buildHandler.stageDir),
@@ -84,7 +80,13 @@ func start(logger *zap.Logger) error {
     zap.String("etcdKey", buildHandler.agentEntry.Key),
     zap.String("zstdPath", buildHandler.zstdPath),
   )
-  internal.ListenAndServeTLS(port, 4*time.Minute, logger)
+  internal.ListenAndServeTLS(port, 4*time.Minute, func() {
+    // remove agent entry before server shutdown (as early as possible)
+    internal.Close(buildHandler.agentEntry, logger)
+  }, logger)
+
+  // wait until all tasks are completed (do not abort)
+  buildHandler.WaitTasksAreComplete()
   return nil
 }
 

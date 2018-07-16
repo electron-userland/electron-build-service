@@ -35,7 +35,9 @@ func createHttpServerOptions(port string) *http.Server {
   }
 }
 
-func ListenAndServeTLS(port string, shutdownTimeout time.Duration, logger *zap.Logger) {
+type BeforeServerShutdown func()
+
+func ListenAndServeTLS(port string, shutdownTimeout time.Duration, beforeServerShutdown BeforeServerShutdown, logger *zap.Logger) {
   http.HandleFunc("/health-check", func(writer http.ResponseWriter, request *http.Request) {
     writer.WriteHeader(200)
   })
@@ -57,6 +59,10 @@ func ListenAndServeTLS(port string, shutdownTimeout time.Duration, logger *zap.L
   signals := make(chan os.Signal, 1)
   signal.Notify(signals, os.Interrupt, syscall.SIGTERM)
   <-signals
+
+  if beforeServerShutdown != nil {
+    beforeServerShutdown()
+  }
   shutdownHttpServer(server, shutdownTimeout, logger)
 }
 

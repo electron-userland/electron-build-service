@@ -1,6 +1,6 @@
 GOPATH = $(CURDIR)/vendor
 
-.PHONY: router builder docker json
+.PHONY: router builder docker json apply bundle
 
 all: router builder
 
@@ -28,3 +28,7 @@ bundle:
 
 dev: docker
 	BUILDER_HOST=localhost BUILDER_PORT=8444 docker-compose up --abort-on-container-exit --remove-orphans --renew-anon-volumes
+
+apply: bundle
+	rancher kubectl apply -f k8s/builder.yml
+	rancher kubectl apply -f k8s/router.yml

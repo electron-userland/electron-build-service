@@ -17,7 +17,7 @@ services:
       DEBUG: null
       PREFERRED_IP_VERSION: null
     hostname: '{{.Node.ID}}-{{.Service.Name}}'
-    image: electronuserland/build-service-builder@sha256:221fc912c758d45c0bec384df313396bc8c343c7f30f7d859a2a8297f119545e
+    image: electronuserland/build-service-builder@sha256:290954bf02de068a7889531ea4201284ac4f9d7529bfbefedf0a89889c30ffca
     logging:
       driver: json-file
       options:
@@ -59,7 +59,7 @@ services:
         constraints:
         - node.labels.admin == true
     hostname: '{{.Node.ID}}-{{.Service.Name}}'
-    image: electronuserland/build-service-router@sha256:210041c6172e02c8eab294b69d8f34984d00b392b174572f51c8c293667409af
+    image: electronuserland/build-service-router@sha256:05f0cb03897c02893d072ef5b565c25ce0262a802663e766b7e8567bc63b429a
     logging:
       driver: json-file
       options:
