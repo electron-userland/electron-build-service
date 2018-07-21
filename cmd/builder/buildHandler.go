@@ -3,24 +3,19 @@ package main
 import (
   "bytes"
   "context"
-    "io"
+  "io"
   "net/http"
   "os"
   "os/exec"
   "path/filepath"
-  "strings"
   "time"
 
   "github.com/apex/log"
   "github.com/develar/errors"
   "github.com/develar/go-fs-util"
-  "github.com/electronuserland/electron-build-service/internal"
-  "github.com/electronuserland/electron-build-service/internal/agentRegistry"
+    "github.com/electronuserland/electron-build-service/internal/agentRegistry"
+  "github.com/electronuserland/electron-build-service/internal/gopool"
   "github.com/json-iterator/go"
-  "github.com/mongodb/amboy"
-  "github.com/mongodb/amboy/job"
-  "github.com/mongodb/amboy/pool"
-  "github.com/mongodb/amboy/queue"
   "github.com/segmentio/ksuid"
   "github.com/tomasen/realip"
   "go.uber.org/zap"
@@ -34,8 +29,9 @@ type BuildHandler struct {
   agentEntry  *agentRegistry.AgentEntry
   logger *zap.Logger
 
-  queue amboy.Queue
-  runner amboy.AbortableRunner
+  queue *gopool.ManagedSource
+  queueContextCancel context.CancelFunc
+  pool gopool.GoPool
 
   stageDir string
   tmpDir   string
@@ -44,32 +40,35 @@ type BuildHandler struct {
 }
 
 func (t *BuildHandler) CreateAndStartQueue(numWorkers int) error {
-  t.queue = queue.NewLocalPriorityQueue(numWorkers)
-  t.runner = pool.NewAbortablePool(numWorkers, t.queue)
-  err := t.queue.SetRunner(t.runner)
-  if err != nil {
-    return errors.WithStack(err)
-  }
-
-  err = t.queue.Start(context.Background())
-  if err != nil {
-    return errors.WithStack(err)
-  }
-
+  ctx, cancel := context.WithCancel(context.Background())
+  t.queueContextCancel = cancel
+  logger := t.logger.Named("queue")
+  t.queue = gopool.NewManagedSource(gopool.NewPriorityQueue(), ctx, logger)
+  jobPool := gopool.New(numWorkers, ctx, t.queue.Source, logger)
+  jobPool.JobMaxTime = jobMaxTime
   return nil
 }
 
 func (t *BuildHandler) WaitTasksAreComplete() {
   t.logger.Info("wait until all tasks are completed", zap.Duration("timeout", queueCompleteTimeOut))
+
+  // defer context cancelling
+  defer t.queueContextCancel()
+
   start := time.Now()
-  timeOutContext, cancel := context.WithTimeout(context.Background(), queueCompleteTimeOut)
-  defer cancel()
-  isCompleted := amboy.WaitCtxInterval(timeOutContext, t.queue, 2*time.Second)
-  if isCompleted {
+  // close queue to not accept new jobs
+  t.queue.Close()
+  // close pool to to ask workers to exit as soon as possible
+  t.pool.Close()
+
+  stopTimer := time.NewTimer(queueCompleteTimeOut)
+  defer stopTimer.Stop()
+
+  select {
+  case <-t.pool.Done():
     t.logger.Info("tasks completed", zap.Duration("duration", time.Since(start)))
-  } else {
+  case <-stopTimer.C:
     log.Warn("cannot wait all uncompleted tasks, abort all")
-    t.runner.AbortAll(context.Background())
   }
 }
 
@@ -130,22 +129,18 @@ func (t *BuildHandler) HandleBuildRequest(w http.ResponseWriter, r *http.Request
 
   jobId := ksuid.New().String()
   buildJob := &BuildJob{
-    Base: job.Base{
-      TaskID:       jobId,
-    },
-
-    buildRequest: &buildRequest,
+    id:              jobId,
+    buildRequest:    &buildRequest,
     rawBuildRequest: &rawRequest,
 
-    projectDir:   filepath.Join(t.stageDir, jobId),
-    handler:      t,
+    projectDir: filepath.Join(t.stageDir, jobId),
+    handler:    t,
 
     messages: make(chan string),
     complete: make(chan BuildJobResult),
 
     logger: logger.With(zap.String("jobId", jobId)),
   }
-  buildJob.UpdateTimeInfo(amboy.JobTimeInfo{MaxTime: jobMaxTime})
 
   err = t.doBuild(w, r, buildJob)
   if err != nil {
@@ -153,11 +148,6 @@ func (t *BuildHandler) HandleBuildRequest(w http.ResponseWriter, r *http.Request
     http.Error(w, "internal server error", http.StatusInternalServerError)
     return
   }
-}
-
-func (t *BuildHandler) cleanUpAfterJobComplete(projectDir string, logger *zap.Logger) {
-  t.updateAgentInfo(0)
-  removeFileAndLog(logger, projectDir)
 }
 
 func (t *BuildHandler) executeUnpackTarZstd(w http.ResponseWriter, r *http.Request, buildJob *BuildJob, projectDir string, ctx context.Context) (error) {
@@ -188,7 +178,8 @@ func (t *BuildHandler) doBuild(w http.ResponseWriter, r *http.Request, buildJob 
 
   t.updateAgentInfo(1)
   defer func() {
-    go t.cleanUpAfterJobComplete(projectDir, logger)
+    go t.updateAgentInfo(0)
+    go removeFileAndLog(logger, projectDir)
   }()
 
   closeNotifier, ok := w.(http.CloseNotifier)
@@ -212,17 +203,15 @@ func (t *BuildHandler) doBuild(w http.ResponseWriter, r *http.Request, buildJob 
   }
 
   buildJob.queueAddTime = time.Now()
-  err = t.queue.Put(buildJob)
-  if err != nil {
-    return errors.WithStack(err)
-  }
+  jobEntry := gopool.NewJob(buildJob, 0)
+  t.queue.Add <- jobEntry
 
   flusher, ok := w.(http.Flusher)
   if !ok {
     return errors.New("cannot cast to Flusher")
   }
 
-  jobId := buildJob.Base.TaskID
+  jobId := buildJob.id
 
   jsonWriter := jsoniter.NewStream(jsoniter.ConfigFastest, w, 16*1024)
 
@@ -231,10 +220,7 @@ func (t *BuildHandler) doBuild(w http.ResponseWriter, r *http.Request, buildJob 
     err := jsonWriter.Flush()
     if err != nil {
       logger.Error("abort job on message write error")
-      abortErr := t.runner.Abort(context.Background(), jobId)
-      if abortErr != nil {
-        logger.Error("cannot abort job", zap.Error(abortErr))
-      }
+      jobEntry.Cancel()
       return err
     }
 
@@ -242,7 +228,7 @@ func (t *BuildHandler) doBuild(w http.ResponseWriter, r *http.Request, buildJob 
     return nil
   }
 
-  ticker := time.NewTicker(30 * time.Second)
+  ticker := time.NewTicker(20 * time.Second)
   defer ticker.Stop()
 
   isCompleted := false
@@ -256,21 +242,20 @@ func (t *BuildHandler) doBuild(w http.ResponseWriter, r *http.Request, buildJob 
           cancelUnpack()
         }
 
-        err = t.runner.Abort(context.Background(), jobId)
-        if err != nil {
-          if strings.Contains(err.Error(), "is not defined") {
-            t.queue.Complete(context.Background(), buildJob)
-          } else {
-            return errors.WithStack(err)
-          }
-        }
+        jobEntry.Cancel()
       }
       return nil
 
     case <-ticker.C:
       // as ping messages to ensure that connection will be not closed
       jsonWriter.Reset(w)
-      writeStatus("build in progress...", jsonWriter)
+      var message string
+      if isCompleted {
+        message = "download in progress..."
+      } else {
+        message = "build in progress..."
+      }
+      writeStatus(message, jsonWriter)
       err = flushJsonWriter()
       if err != nil {
         logger.Error("cannot write ping message", zap.Error(err))
@@ -302,10 +287,12 @@ func (t *BuildHandler) doBuild(w http.ResponseWriter, r *http.Request, buildJob 
   }
 }
 
-func (t *BuildHandler) updateAgentInfo(relativeValue int) {
-  queueStats := t.queue.Stats()
-  t.logger.Debug("queue stat", zap.Int("pending", queueStats.Pending), zap.Int("running", queueStats.Running))
-  t.agentEntry.Update(queueStats.Pending + queueStats.Running + relativeValue /* our job */)
+func (t *BuildHandler) updateAgentInfo(relativeValue uint32) {
+  pending := t.queue.PendingJobCount.Load()
+  running := t.pool.RunningJobCount.Load()
+  t.logger.Debug("queue stat", zap.Uint32("pending", pending), zap.Uint32("running", running))
+  count := pending + running + relativeValue
+  t.agentEntry.Update(int(count) /* our job */)
 }
 
 func writeStatus(message string, jsonWriter *jsoniter.Stream) {
@@ -355,7 +342,14 @@ func writeResultInfo(result *BuildJobResult, jobId string, jsonWriter *jsoniter.
 }
 
 func (t *BuildHandler) unpackTarZstd(reader io.ReadCloser, unpackDir string, ctx context.Context, logger *zap.Logger) error {
-  defer internal.Close(reader, logger)
+  defer func() {
+    err := reader.Close()
+    // do not log ErrUnexpectedEOF - it means that client closed connection during upload
+    if err != nil && err != os.ErrClosed && err != io.ErrUnexpectedEOF {
+      logger.Error("cannot close", zap.Error(err))
+    }
+  }()
+
   command := exec.CommandContext(ctx, "tar", "--use-compress-program=" + t.zstdPath, "-x", "-C", unpackDir)
   command.Stdin = reader
 

@@ -1,7 +1,7 @@
 package main
 
 import (
-    "context"
+  "context"
   "fmt"
   "io/ioutil"
   "os"
@@ -13,11 +13,12 @@ import (
   "github.com/develar/go-fs-util"
   "github.com/electronuserland/electron-build-service/internal"
   "github.com/json-iterator/go"
-  "github.com/mongodb/amboy/job"
   "go.uber.org/zap"
 )
 
 type BuildJob struct {
+  id string
+
   projectDir   string
   queueAddTime time.Time
 
@@ -32,9 +33,9 @@ type BuildJob struct {
   // error - only internal error, not from electron-builder
   complete chan BuildJobResult
 
-  job.Base
-
   logger *zap.Logger
+
+  context context.Context
 }
 
 type BuildJobResult struct {
@@ -45,10 +46,12 @@ type BuildJobResult struct {
 
 const outDirName = "out"
 
+func (t *BuildJob) String() string {
+  return t.id
+}
+
 func (t *BuildJob) Run(ctx context.Context) {
-  defer func() {
-    t.Base.MarkComplete()
-  }()
+  t.context = ctx
 
   jobStartTime := time.Now()
   waitTime := jobStartTime.Sub(t.queueAddTime)
@@ -70,7 +73,7 @@ func (t *BuildJob) doBuild(buildContext context.Context, jobStartTime time.Time)
   }()
 
   // where electron-builder creates temp files
-  projectTempDir := filepath.Join(t.handler.tmpDir, t.ID())
+  projectTempDir := filepath.Join(t.handler.tmpDir, t.id)
   // t.handler.tmpDir should be already created,
   err := os.Mkdir(projectTempDir, 0700)
   if err != nil {
@@ -81,6 +84,10 @@ func (t *BuildJob) doBuild(buildContext context.Context, jobStartTime time.Time)
   err = fsutil.EnsureEmptyDir(projectOutDir)
   if err != nil {
     return errors.WithStack(err)
+  }
+
+  if buildContext.Err() != nil {
+    return buildContext.Err()
   }
 
   command := exec.CommandContext(buildContext, "node", "/node_modules/electron-builder-lib/out/remoteBuilder/builder-cli.js", *t.rawBuildRequest)
