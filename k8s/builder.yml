@@ -24,7 +24,7 @@ spec:
                     values:
                       - "true"
       containers:
-        - image: electronuserland/build-service-builder@sha256:c77c5b53aa4e28bfab4949d5e006bf21f914e7ad5ed8c118959fdb6f1fac316e
+        - image: electronuserland/build-service-builder@sha256:76df8ad98eb1a2b190419be7c9e4f5bd569e83ba7ef138eb45e4945607447ab2
           name: builder
           ports:
             - containerPort: 443

@@ -326,13 +326,10 @@ func writeResultInfo(result *BuildJobResult, jobId string, jsonWriter *jsoniter.
     jsonWriter.WriteObjectField("fileSizes")
     jsonWriter.WriteArrayStart()
 
-    isFirst := true
-    for _, value := range result.fileSizes {
-      if !isFirst {
+    for index, value := range result.fileSizes {
+      if index != 0 {
         jsonWriter.WriteMore()
-        isFirst = false
       }
-
       jsonWriter.WriteInt64(value)
     }
     jsonWriter.WriteArrayEnd()
