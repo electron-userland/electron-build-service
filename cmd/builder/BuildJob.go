@@ -90,7 +90,7 @@ func (t *BuildJob) doBuild(buildContext context.Context, jobStartTime time.Time)
     return buildContext.Err()
   }
 
-  command := exec.CommandContext(buildContext, "node", "/node_modules/electron-builder-lib/out/remoteBuilder/builder-cli.js", *t.rawBuildRequest)
+  command := exec.CommandContext(buildContext, "node", "/node_modules/app-builder-lib/out/remoteBuilder/builder-cli.js", *t.rawBuildRequest)
   command.Env = append(os.Environ(),
     "PROJECT_DIR="+t.projectDir,
     "PROJECT_OUT_DIR="+projectOutDir,

@@ -17,7 +17,7 @@ services:
       DEBUG: null
       PREFERRED_IP_VERSION: null
     hostname: '{{.Node.ID}}-{{.Service.Name}}'
-    image: electronuserland/build-service-builder@sha256:17ed20ac7393077e0dc0f81289f32f9907eb1cb8343d01edfc06ddca54ba817c
+    image: electronuserland/build-service-builder@sha256:c77c5b53aa4e28bfab4949d5e006bf21f914e7ad5ed8c118959fdb6f1fac316e
     logging:
       driver: json-file
       options:
@@ -47,7 +47,7 @@ services:
         constraints:
         - node.labels.admin == true
     entrypoint: /usr/local/bin/etcd
-    image: gcr.io/etcd-development/etcd@sha256:87921b377d5696461975582fc8a4d2ed0b7991ad82afbc4cbe68ef383ff6c295
+    image: gcr.io/etcd-development/etcd@sha256:0d79c080d14053e90f22ad09e261c48bf83d296967b8e772d47250f72df6877b
     ports:
     - mode: host
       published: 2379
@@ -59,7 +59,7 @@ services:
         constraints:
         - node.labels.admin == true
     hostname: '{{.Node.ID}}-{{.Service.Name}}'
-    image: electronuserland/build-service-router@sha256:5a57c2ec691503ff06a41ae6948ee99978a509ed9fa968c7d29ae3a8bc908940
+    image: electronuserland/build-service-router@sha256:809dadc31df6b103f305650d9c2276b1d6abe4ecf2ab2a4b07df792bc0cad928
     logging:
       driver: json-file
       options:

@@ -2,7 +2,7 @@ version: "3.4"
 services:
   # etcd doesn't support swarm and etcd cluster setup is complex and not simple, in any case, single is enough (no need to store data)
   etcd-cluster-client:
-    image: gcr.io/etcd-development/etcd:v3.3.8
+    image: gcr.io/etcd-development/etcd:v3.3.10
     command:
     - --name=etcd
     - --advertise-client-urls=http://etcd:2379

@@ -22,6 +22,7 @@ update_engine_client -update
 
 ```
 apt-get update && apt-get upgrade -y && curl https://releases.rancher.com/install-docker/17.03.sh | sh
+apt-mark hold docker-ce
 ```
 
 ## Clear Rancher Node
