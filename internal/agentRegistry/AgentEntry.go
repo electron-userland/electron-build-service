@@ -31,6 +31,10 @@ func computeRenewLeaseTimerDuration(ttlInSeconds int64) time.Duration {
 }
 
 func NewAgentEntry(key string, logger *zap.Logger) (*AgentEntry, error) {
+  return createOrUpdateAgentEntry(key, logger.With(zap.String("key", key)), nil)
+}
+
+func createOrUpdateAgentEntry(key string, logger *zap.Logger, agentEntry *AgentEntry) (*AgentEntry, error) {
   logger.Info("register agent")
   store, err := internal.CreateEtcdClient()
   if err != nil {
@@ -60,13 +64,22 @@ func NewAgentEntry(key string, logger *zap.Logger) (*AgentEntry, error) {
         response, err := store.KeepAliveOnce(context.Background(), leaseGrantResponse.ID)
         if err != nil {
           if err == rpctypes.ErrLeaseNotFound {
-            logger.Warn("cannot renew the agent entry lease", zap.String("key", key), zap.String("reason", err.Error()), zap.String("solution", "agent will be registered again"))
+            logger.Warn("cannot renew the agent entry lease", zap.NamedError("reason", err), zap.String("solution", "agent will be registered again"))
+
+            closeOldErr := agentEntry.Close()
+            if closeOldErr != nil {
+              logger.Warn("cannot unregister old agent", zap.Error(err))
+            }
+
             // register new
-            NewAgentEntry(key, logger)
+            _, err = createOrUpdateAgentEntry(key, logger, agentEntry)
+            if err != nil {
+              logger.Warn("cannot register new agent", zap.Error(err))
+            }
             return
           }
 
-          logger.Error("cannot renew the agent entry lease", zap.String("key", key), zap.Error(err))
+          logger.Error("cannot renew the agent entry lease", zap.Error(err))
         }
 
         timer.Reset(computeRenewLeaseTimerDuration(response.TTL))
@@ -74,22 +87,30 @@ func NewAgentEntry(key string, logger *zap.Logger) (*AgentEntry, error) {
     }
   }()
 
-  entry := &AgentEntry{
-    Key:    key,
-    logger: logger,
-    store:  store,
+  if agentEntry == nil {
+    agentEntry = &AgentEntry{
+      Key:    key,
+      logger: logger,
+      store:  store,
 
-    leaseId:  leaseGrantResponse.ID,
-    timer:    timer,
-    isClosed: isClosed,
+      leaseId:  leaseGrantResponse.ID,
+      timer:    timer,
+      isClosed: isClosed,
+    }
+  } else {
+    agentEntry.store = store
+
+    agentEntry.leaseId = leaseGrantResponse.ID
+    agentEntry.timer = timer
+    agentEntry.isClosed = isClosed
   }
-  return entry, nil
+  return agentEntry, nil
 }
 
 func (t *AgentEntry) Update(jobCount int) {
   _, err := t.store.Put(context.Background(), t.Key, string([]byte{byte(runtime.NumCPU()), byte(jobCount)}), clientv3.WithLease(t.leaseId))
   if err != nil {
-    t.logger.Error("cannot update job", zap.String("key", t.Key), zap.Error(err))
+    t.logger.Error("cannot update job", zap.Error(err))
   }
 }
 

@@ -22,7 +22,7 @@ spec:
                 values:
                 - "true"
       containers:
-      - image: electronuserland/build-service-router@sha256:809dadc31df6b103f305650d9c2276b1d6abe4ecf2ab2a4b07df792bc0cad928
+      - image: electronuserland/build-service-router@sha256:75cd53b315bbdd8ea118fbaff2addea82c705a0eb5d2578f182003baa7f13ccf
         name: router
         ports:
         - containerPort: 443

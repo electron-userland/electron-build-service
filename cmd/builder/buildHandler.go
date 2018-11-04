@@ -26,12 +26,12 @@ const maxRequestBody = 768*1024*1024
 const jobMaxTime = 30 * time.Minute
 
 type BuildHandler struct {
-  agentEntry  *agentRegistry.AgentEntry
-  logger *zap.Logger
+  agentEntry *agentRegistry.AgentEntry
+  logger     *zap.Logger
 
-  queue *gopool.ManagedSource
+  queue              *gopool.ManagedSource
   queueContextCancel context.CancelFunc
-  pool gopool.GoPool
+  pool               gopool.GoPool
 
   stageDir string
   tmpDir   string

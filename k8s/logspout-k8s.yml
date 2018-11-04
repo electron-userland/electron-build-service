@@ -15,7 +15,7 @@ spec:
       hostIPC: true
       hostNetwork: true
       containers:
-        - image: gliderlabs/logspout:v3.2.5
+        - image: gliderlabs/logspout:v3.2.6
           name: logspout
           env:
             - name: SYSLOG_TAG
