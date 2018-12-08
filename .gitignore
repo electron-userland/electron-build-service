@@ -1,6 +1,5 @@
 node_modules
 out/
-.idea
 yarn-error.log
 scripts/private
 vendor/

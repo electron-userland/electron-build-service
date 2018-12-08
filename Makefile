@@ -1,5 +1,3 @@
-GOPATH = $(CURDIR)/vendor
-
 .PHONY: router builder docker json apply bundle
 
 all: router builder
@@ -10,9 +8,9 @@ router:
 builder:
 	GOOS=linux GOARCH=amd64 go build -ldflags='-s -w' -o out/linux/builder ./cmd/builder
 
-# vetshadow is disabled because of err (https://groups.google.com/forum/#!topic/golang-nuts/ObtoxsN7AWg)
+# brew install golangci/tap/golangci-lint && brew upgrade golangci/tap/golangci-lint
 lint:
-	gometalinter --aggregate --sort=path --vendor --skip=node_modules ./...
+	golangci-lint run
 
 docker: all
 	docker build -f cmd/builder/Dockerfile -t electronuserland/build-service-builder .
@@ -27,8 +25,10 @@ bundle:
 	./scripts/build-bundle.sh
 
 dev: docker
+	docker-compose pull etcd-cluster-client
 	BUILDER_HOST=localhost BUILDER_PORT=8444 docker-compose up --abort-on-container-exit --remove-orphans --renew-anon-volumes
 
+# https://github.com/rancher/cli/releases
 apply: bundle
 	rancher kubectl apply -f k8s/builder.yml
 	rancher kubectl apply -f k8s/router.yml

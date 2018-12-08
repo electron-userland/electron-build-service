@@ -11,7 +11,7 @@ import (
 	"io"
 	"log"
 	"strconv"
-		"testing"
+	"testing"
 	"time"
 
 	"go.uber.org/zap"
@@ -116,7 +116,7 @@ func TestPriorityQueue(t *testing.T) {
 	}
 	// Read them all back and run them.
 	for c := q.Next(); c != nil; c = q.Next() {
-		c.GetRunnable(nil).Run(nil)
+		c.GetRunnable(nil).Run(context.Background())
 	}
 	if buf.String() != "9876543210" {
 		t.Errorf("priority wasn'job properly applied. Expected 9876543210, but got %v", buf.String())
@@ -131,5 +131,9 @@ type sct struct {
 	w    io.Writer
 }
 
-func (t *sct) Run(ctx context.Context) { t.ctx = ctx; t.w.Write([]byte(t.name)) }
-func (t *sct) String() string          { return t.name }
+func (t *sct) Run(ctx context.Context) {
+	t.ctx = ctx
+	_, _ = t.w.Write([]byte(t.name))
+}
+
+func (t *sct) String() string { return t.name }
