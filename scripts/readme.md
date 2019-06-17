@@ -10,8 +10,12 @@ update_engine_client -update
 ## Ubuntu
 
 ```
-apt-get update && apt-get upgrade -y && curl https://releases.rancher.com/install-docker/17.03.sh | sh
+apt-get update && apt-get upgrade -y && curl https://releases.rancher.com/install-docker/18.09.sh | sh
 apt-mark hold docker-ce
+```
+
+```
+docker run -d --restart=unless-stopped -p 80:80 -p 443:443 rancher/rancher --acme-domain rancher.develar.org
 ```
 
 ## Clear Rancher Node

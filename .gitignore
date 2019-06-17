@@ -3,3 +3,4 @@ out/
 yarn-error.log
 scripts/private
 vendor/
+.idea/workspace.xml

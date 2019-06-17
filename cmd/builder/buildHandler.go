@@ -34,9 +34,10 @@ type BuildHandler struct {
 	pool               gopool.GoPool
 
 	stageDir string
-	tmpDir   string
+	tempDir  string
 
-	zstdPath string
+	zstdPath   string
+	scriptPath string
 }
 
 func (t *BuildHandler) CreateAndStartQueue(numWorkers int) error {
@@ -78,7 +79,7 @@ func (t *BuildHandler) PrepareDirs() error {
 		return errors.WithStack(err)
 	}
 
-	err = fsutil.EnsureEmptyDir(t.tmpDir)
+	err = fsutil.EnsureEmptyDir(t.tempDir)
 	if err != nil {
 		return errors.WithStack(err)
 	}

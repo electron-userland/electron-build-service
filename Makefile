@@ -1,10 +1,5 @@
 .PHONY: router builder docker json apply bundle
 
-all: router builder
-
-router:
-	GOOS=linux GOARCH=amd64 go build -ldflags='-s -w' -o out/linux/router ./cmd/router
-
 builder:
 	GOOS=linux GOARCH=amd64 go build -ldflags='-s -w' -o out/linux/builder ./cmd/builder
 
@@ -12,9 +7,8 @@ builder:
 lint:
 	golangci-lint run
 
-docker: all
+docker: builder
 	docker build -f cmd/builder/Dockerfile -t electronuserland/build-service-builder .
-	docker build -f cmd/router/Dockerfile -t electronuserland/build-service-router .
 
 push-docker: docker
 	docker push electronuserland/build-service-builder
@@ -25,10 +19,19 @@ bundle:
 	./scripts/build-bundle.sh
 
 dev: docker
-	docker-compose pull etcd-cluster-client
 	BUILDER_HOST=localhost BUILDER_PORT=8444 docker-compose up --abort-on-container-exit --remove-orphans --renew-anon-volumes
+	multipass launch --name build-service || true
+
+	multipass umount build-service:/project || true
+	multipass mount . build-service:/project
+
+	multipass exec build-service /project/scripts/prepare-linux-host.sh
+	multipass exec build-service start.sh
 
 # https://github.com/rancher/cli/releases
 apply: bundle
 	rancher kubectl apply -f k8s/builder.yml
-	rancher kubectl apply -f k8s/router.yml
+
+update-deps:
+	go get -u ./cmd/builder
+	go mod tidy

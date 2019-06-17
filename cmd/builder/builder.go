@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/coreos/etcd/embed"
 	"github.com/develar/app-builder/pkg/util"
 	"io/ioutil"
 	"log"
@@ -30,6 +31,20 @@ func main() {
 		}
 	}()
 
+	if util.IsEnvTrue("USE_EMBEDDED_ETCD") {
+		err := os.Setenv("ETCD_ENDPOINT", embed.DefaultListenClientURLs)
+		if err != nil {
+			logger.Fatal("cannot set env ETCD_ENDPOINT", zap.Error(err))
+		}
+
+		serverEtcd, err := internal.StartEmbeddedServer(logger)
+		if err != nil {
+			logger.Fatal("cannot start embedded etcd server", zap.Error(err))
+		}
+
+		defer serverEtcd.Close()
+	}
+
 	err := start(logger)
 	if err != nil {
 		logger.Fatal("cannot start", zap.Error(err))
@@ -47,11 +62,21 @@ func start(logger *zap.Logger) error {
 		return errors.WithStack(err)
 	}
 
+	scriptPath := os.Getenv("BUILDER_NODE_MODULES")
+	if scriptPath == "" {
+		executableFile, err := os.Executable()
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		scriptPath = filepath.Join(filepath.Dir(executableFile), "../..")
+	}
+
 	buildHandler := &BuildHandler{
-		logger:   logger,
-		stageDir: string(os.PathSeparator) + "stage",
-		tmpDir:   builderTmpDir,
-		zstdPath: filepath.Join(zstdPath, "zstd"),
+		logger:     logger,
+		stageDir:   getDirectory("stage"),
+		tempDir:    builderTmpDir,
+		zstdPath:   filepath.Join(zstdPath, "zstd"),
+		scriptPath: filepath.Join(scriptPath, "node_modules/app-builder-lib/out/remoteBuilder/builder-cli.js"),
 	}
 
 	err = buildHandler.PrepareDirs()
@@ -82,12 +107,18 @@ func start(logger *zap.Logger) error {
 		return errors.WithStack(err)
 	}
 
+	err = configureRouter(logger)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
 	logger.Info("started",
 		zap.String("port", port),
 		zap.String("stage dir", buildHandler.stageDir),
-		zap.String("temp dir", buildHandler.tmpDir),
+		zap.String("temp dir", buildHandler.tempDir),
 		zap.String("etcdKey", buildHandler.agentEntry.Key),
 		zap.String("zstdPath", buildHandler.zstdPath),
+		zap.String("scriptPath", buildHandler.scriptPath),
 	)
 
 	internal.WaitUntilTerminated(server, 4*time.Minute, func() {
@@ -100,10 +131,23 @@ func start(logger *zap.Logger) error {
 	return nil
 }
 
+func getDirectory(name string) string {
+	var prefix string
+	userName := os.Getenv("USER")
+	if userName == "" || userName == "root" {
+		// in docker or if running from root, just use root dir
+		prefix = ""
+	} else {
+		prefix = os.Getenv("HOME")
+	}
+	return prefix + string(os.PathSeparator) + name
+}
+
 func getBuilderTmpDir() (string, error) {
-	builderTmpDir := os.Getenv("ELECTRON_BUILDER_TMP_DIR")
+	builderTmpDir := os.Getenv("APP_BUILDER_TMP_DIR")
+
 	if builderTmpDir == "" {
-		builderTmpDir = string(os.PathSeparator) + "builder-tmp"
+		builderTmpDir = getDirectory("tmp")
 	} else {
 		homeDir, err := homedir.Dir()
 		if err != nil {
@@ -111,7 +155,7 @@ func getBuilderTmpDir() (string, error) {
 		}
 
 		if builderTmpDir == os.TempDir() || strings.HasPrefix(homeDir, builderTmpDir) || builderTmpDir == "/" {
-			return "", fmt.Errorf("%s cannot be used as ELECTRON_BUILDER_TMP_DIR because this dir will be emptied", builderTmpDir)
+			return "", fmt.Errorf("%s cannot be used as APP_BUILDER_TMP_DIR because this dir will be emptied", builderTmpDir)
 		}
 	}
 
@@ -129,6 +173,7 @@ func getAgentKey(port string, logger *zap.Logger) (string, error) {
 func getExternalPublicIp(logger *zap.Logger) (string, error) {
 	explicit := os.Getenv("BUILDER_HOST")
 	if explicit != "" {
+		explicit = strings.TrimSpace(explicit)
 		logger.Debug("host specified explicitly via env", zap.String("host", explicit))
 		return explicit, nil
 	}

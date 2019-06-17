@@ -2,33 +2,15 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"sort"
 	"time"
 
-	"github.com/develar/errors"
 	"github.com/didip/tollbooth"
 	"github.com/didip/tollbooth/limiter"
-	"github.com/electronuserland/electron-build-service/internal"
 	"github.com/electronuserland/electron-build-service/internal/agentRegistry"
 	"go.uber.org/zap"
 )
-
-func main() {
-	logger := internal.CreateLogger()
-	defer func() {
-		err := logger.Sync()
-		if err != nil {
-			log.Printf("cannot sync logger: %s", err)
-		}
-	}()
-
-	err := start(logger)
-	if err != nil {
-		logger.Fatal("cannot start", zap.Error(err))
-	}
-}
 
 type AgentRouter struct {
 	agentRegistry *agentRegistry.AgentRegistry
@@ -75,30 +57,15 @@ func (t *AgentRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	_, _ = fmt.Fprintf(w, `{"endpoint": "https://%s"}`, agent.Address)
 }
 
-func start(logger *zap.Logger) error {
-	registry, err := agentRegistry.NewAgentRegistry(logger)
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
-	err = registry.Listen()
-	if err != nil {
-		return errors.WithStack(err)
-	}
-	defer internal.Close(registry, logger)
-
+func configureRouter(logger *zap.Logger) error {
 	limit := tollbooth.NewLimiter(1, &limiter.ExpirableOptions{DefaultExpirationTTL: time.Hour})
 	limit.SetBurst(10)
 
 	http.Handle("/find-build-agent", tollbooth.LimitHandler(limit, &AgentRouter{
-		agentRegistry: registry,
+		agentRegistry: agentRegistry.NewAgentRegistry(logger),
 		logger:        logger,
 	}))
 
-	port := internal.GetListenPort("ROUTER_PORT")
-	server := internal.ListenAndServe(port, logger)
-	logger.Info("started", zap.String("port", port))
-	internal.WaitUntilTerminated(server, 5*time.Second, nil, logger)
 	return nil
 }
 
