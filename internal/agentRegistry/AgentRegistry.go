@@ -126,8 +126,6 @@ func (t *AgentRegistry) GetAgents() (map[string]*BuildAgent, error) {
 		if err != nil {
 			return nil, errors.WithStack(err)
 		}
-
-		defer internal.Close(t, t.logger)
 	}
 
 	response, err := t.store.Get(context.Background(), "/builders/", clientv3.WithPrefix())
@@ -163,6 +161,10 @@ func etcdKeyToOurMapKey(keyValue *mvccpb.KeyValue) string {
 }
 
 func (t *AgentRegistry) Close() error {
+	if t.store == nil {
+		return nil
+	}
+
 	err := t.store.Close()
 	if err == rpctypes.ErrLeaseNotFound {
 		return nil

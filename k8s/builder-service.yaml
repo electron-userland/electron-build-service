@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: builder
+spec:
+  selector:
+    app: builder
+  ports:
+  - protocol: TCP
+    port: 443
+    targetPort: 443
+  externalIPs:
+    - 51.38.69.239

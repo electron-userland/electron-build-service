@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/develar/app-builder/pkg/util"
 	"net/http"
 	"sort"
 	"time"
@@ -57,12 +58,16 @@ func (t *AgentRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	_, _ = fmt.Fprintf(w, `{"endpoint": "https://%s"}`, agent.Address)
 }
 
-func configureRouter(logger *zap.Logger) error {
+func configureRouter(logger *zap.Logger, disposer *Disposer) error {
 	limit := tollbooth.NewLimiter(1, &limiter.ExpirableOptions{DefaultExpirationTTL: time.Hour})
 	limit.SetBurst(10)
 
+	a := agentRegistry.NewAgentRegistry(logger)
+	disposer.Add(func() {
+		util.Close(a)
+	})
 	http.Handle("/find-build-agent", tollbooth.LimitHandler(limit, &AgentRouter{
-		agentRegistry: agentRegistry.NewAgentRegistry(logger),
+		agentRegistry: a,
 		logger:        logger,
 	}))
 

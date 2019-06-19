@@ -1,9 +1,13 @@
 <component name="ProjectDictionaryState">
   <dictionary name="develar">
     <words>
+      <w>balancer</w>
       <w>etcd</w>
       <w>gopool</w>
+      <w>nginx</w>
       <w>papertrail</w>
+      <w>traefik</w>
+      <w>xenial</w>
       <w>zstd</w>
     </words>
   </dictionary>

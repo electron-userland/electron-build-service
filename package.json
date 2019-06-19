@@ -5,6 +5,9 @@
     "dist": "yarn build && yarn build-router && yarn push && yarn push-router && yarn bundle"
   },
   "dependencies": {
-    "app-builder-lib": "20.44.1"
+    "app-builder-lib": "20.44.2"
+  },
+  "resolutions": {
+    "app-builder-bin": "2.6.17"
   }
 }

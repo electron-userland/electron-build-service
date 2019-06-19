@@ -2,6 +2,7 @@ package internal
 
 import (
 	"github.com/coreos/etcd/embed"
+	"github.com/coreos/pkg/capnslog"
 	"github.com/develar/app-builder/pkg/util"
 	"go.uber.org/zap"
 	"os"
@@ -13,8 +14,11 @@ import (
 
 func StartEmbeddedServer(logger *zap.Logger) (*embed.Etcd, error) {
 	config := embed.NewConfig()
-	config.Dir = "/tmp/builder-etcd"
-	logger.Debug("start embedded etcd server")
+	config.Dir = GetBuilderDirectory("embedded-etcd")
+	// https://github.com/etcd-io/etcd/issues/8397
+	config.LogPkgLevels = "*=E"
+	capnslog.SetGlobalLogLevel(capnslog.ERROR)
+	logger.Info("start embedded etcd server", zap.String("dir", config.Dir))
 	embeddedEtcd, err := embed.StartEtcd(config)
 	if err != nil {
 		return nil, errors.WithStack(err)

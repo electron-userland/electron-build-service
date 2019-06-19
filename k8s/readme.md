@@ -1,11 +1,25 @@
-1. Catalog Apps -> etcd-operator from Rancher Library (not from Helm)
+`brew install rancher-cli` to install [rancher](https://github.com/rancher/cli) CLI.
 
-   Etcd Cluster Version: 3.2.23 (3.3.x not officially supported — https://github.com/coreos/etcd-operator/issues/1731).
+1. Create cluster and disable ingress controller:
+
+    ```yaml
+    ingress: 
+      provider: "none"
+    ```
+
+2. If not embedded etcd is used: Catalog Apps -> etcd-operator from Rancher Library (not from Helm).
+
+   Etcd Cluster Version: 3.2.26 (3.3.x not officially supported — https://github.com/coreos/etcd-operator/issues/1731).
    
-2. Import `tls.yml` to create TLS secret. Or create using `Resources -> Secrets` (name `tls`, data keys: `tls.cert` and `tls.key`).
+3. Import secret `tls.yaml` to create TLS secret. Or create using `Resources -> Secrets`:
+    * name: `tls`,
+    * data keys: `tls.cert` (expected bundle - first node cert, second certificate authority cert) and `tls.key`.
 
-3. Import `builder.yml`. **Do not forget to update externalIPs**. See note below about MetalLB. 
-
+4. Import secret `papertrail-destination.yaml`. Or create using `Resources -> Secrets`:
+    * name: `papertrail-destination`, 
+    * key: `papertrail-destination`, 
+    * value: `syslog+tls://logsN.papertrailapp.com:N?filter.name=k8s_builder_*` + (see [papertrail destination](https://papertrailapp.com/account/destinations)).
+5. Import `logspout.yaml`, `builder.yml`, `builder-service.yaml`. Or `make add-cluster-resources`.
 
 ## Notes
   * "Import" means using Rancher `Import YAML` action.

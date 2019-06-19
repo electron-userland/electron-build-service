@@ -1,8 +1,12 @@
 package main
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"fmt"
+	"github.com/develar/app-builder/pkg/util"
+	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -100,13 +104,9 @@ func (t *BuildJob) doBuild(buildContext context.Context, jobStartTime time.Time)
 	)
 	command.Dir = t.projectDir
 
-	output, err := command.CombinedOutput()
-	if len(output) != 0 {
-		t.messages <- string(output)
-	}
-
+	err = t.doExecute(command)
 	if err != nil {
-		return errors.WithStack(err)
+		return err
 	}
 
 	if buildContext.Err() != nil {
@@ -140,6 +140,66 @@ func (t *BuildJob) doBuild(buildContext context.Context, jobStartTime time.Time)
 
 	go t.removeAllFilesExceptArtifacts(projectTempDir)
 
+	return nil
+}
+
+func (t *BuildJob) doExecute(command *exec.Cmd) error {
+	r, w := io.Pipe()
+	defer util.Close(r)
+	defer util.Close(w)
+
+	command.Stdout = w
+	command.Stderr = w
+
+	err := command.Start()
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	go func() {
+		outReader := bufio.NewReader(r)
+		var b bytes.Buffer
+		for {
+			line, err := outReader.ReadString('\n')
+			if err != nil {
+				if err != io.EOF && err != io.ErrClosedPipe {
+					t.logger.Error("cannot read builder output", zap.Error(err))
+				}
+				break
+			}
+
+			// do not send status if some new lines are already available
+			if outReader.Buffered() > 0 {
+				b.WriteString(line)
+				continue
+			} else if b.Len() == 0 {
+				t.messages <- line
+			} else {
+				b.WriteString(line)
+				t.messages <- b.String()
+				b.Reset()
+			}
+		}
+
+		// read rest (if no new line in the end)
+		_, err = outReader.WriteTo(&b)
+		if err != nil && err != io.EOF && err != io.ErrClosedPipe {
+			t.logger.Error("cannot read builder output", zap.Error(err))
+		}
+
+		if b.Len() > 0 {
+			t.messages <- b.String()
+		}
+	}()
+
+	err = command.Wait()
+
+	util.Close(r)
+	util.Close(w)
+
+	if err != nil {
+		return errors.WithStack(err)
+	}
 	return nil
 }
 

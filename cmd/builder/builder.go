@@ -73,7 +73,7 @@ func start(logger *zap.Logger) error {
 
 	buildHandler := &BuildHandler{
 		logger:     logger,
-		stageDir:   getDirectory("stage"),
+		stageDir:   internal.GetBuilderDirectory("stage"),
 		tempDir:    builderTmpDir,
 		zstdPath:   filepath.Join(zstdPath, "zstd"),
 		scriptPath: filepath.Join(scriptPath, "node_modules/app-builder-lib/out/remoteBuilder/builder-cli.js"),
@@ -102,12 +102,15 @@ func start(logger *zap.Logger) error {
 	port := internal.GetListenPort("BUILDER_PORT")
 	server := internal.ListenAndServe(port, logger)
 
-	err = buildHandler.RegisterAgent(port)
+	disposer := NewDisposer()
+	defer disposer.Dispose()
+
+	err = buildHandler.RegisterAgent(port, disposer)
 	if err != nil {
 		return errors.WithStack(err)
 	}
 
-	err = configureRouter(logger)
+	err = configureRouter(logger, disposer)
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -119,11 +122,12 @@ func start(logger *zap.Logger) error {
 		zap.String("etcdKey", buildHandler.agentEntry.Key),
 		zap.String("zstdPath", buildHandler.zstdPath),
 		zap.String("scriptPath", buildHandler.scriptPath),
+		zap.Strings("env", os.Environ()),
 	)
 
 	internal.WaitUntilTerminated(server, 4*time.Minute, func() {
 		// remove agent entry before server shutdown (as early as possible)
-		internal.Close(buildHandler.agentEntry, logger)
+		disposer.Dispose()
 	}, logger)
 
 	// wait until all tasks are completed (do not abort)
@@ -131,23 +135,11 @@ func start(logger *zap.Logger) error {
 	return nil
 }
 
-func getDirectory(name string) string {
-	var prefix string
-	userName := os.Getenv("USER")
-	if userName == "" || userName == "root" {
-		// in docker or if running from root, just use root dir
-		prefix = ""
-	} else {
-		prefix = os.Getenv("HOME")
-	}
-	return prefix + string(os.PathSeparator) + name
-}
-
 func getBuilderTmpDir() (string, error) {
 	builderTmpDir := os.Getenv("APP_BUILDER_TMP_DIR")
 
 	if builderTmpDir == "" {
-		builderTmpDir = getDirectory("tmp")
+		builderTmpDir = internal.GetBuilderDirectory("tmp")
 	} else {
 		homeDir, err := homedir.Dir()
 		if err != nil {

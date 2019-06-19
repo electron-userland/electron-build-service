@@ -108,3 +108,15 @@ func Close(c io.Closer, logger *zap.Logger) {
 		logger.Error("cannot close", zap.Error(err))
 	}
 }
+
+func GetBuilderDirectory(name string) string {
+	var prefix string
+	userName := os.Getenv("USER")
+	if userName == "" || userName == "root" {
+		// in docker or if running from root, just use root dir
+		prefix = ""
+	} else {
+		prefix = os.Getenv("HOME")
+	}
+	return prefix + string(os.PathSeparator) + "builder-" + name
+}

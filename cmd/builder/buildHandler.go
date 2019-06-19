@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"github.com/develar/app-builder/pkg/util"
 	"io"
 	"net/http"
 	"os"
@@ -87,7 +88,7 @@ func (t *BuildHandler) PrepareDirs() error {
 	return nil
 }
 
-func (t *BuildHandler) RegisterAgent(port string) error {
+func (t *BuildHandler) RegisterAgent(port string, disposer *Disposer) error {
 	agentKey, err := getAgentKey(port, t.logger)
 	if err != nil {
 		return errors.WithStack(err)
@@ -99,6 +100,9 @@ func (t *BuildHandler) RegisterAgent(port string) error {
 	}
 
 	t.agentEntry = agentEntry
+	disposer.Add(func() {
+		util.Close(agentEntry)
+	})
 	return nil
 }
 

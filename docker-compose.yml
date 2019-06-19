@@ -1,38 +1,20 @@
-version: "3.4"
+version: "3.6"
 services:
-  # etcd doesn't support swarm and etcd cluster setup is complex and not simple, in any case, single is enough (no need to store data)
-  etcd-cluster-client:
-    image: gcr.io/etcd-development/etcd:v3.3.10
-    command:
-    - --name=etcd
-    - --advertise-client-urls=http://etcd:2379
-    - --listen-client-urls=http://0.0.0.0:2379
-    entrypoint: /usr/local/bin/etcd
-    ports:
-      - target: 2379
-        published: 2379
-        mode: host
-    deploy:
-      endpoint_mode: dnsrr
-      mode: global
-      placement:
-        constraints:
-          - node.labels.admin == true
   builder:
     image: electronuserland/build-service-builder
-    hostname: "{{.Node.ID}}-{{.Service.Name}}"
     environment:
       - BUILDER_HOST
       - BUILDER_PORT
       - DEBUG
       - PREFERRED_IP_VERSION
+      - USE_EMBEDDED_ETCD
+      - SNAP_DESTRUCTIVE_MODE
     ports:
       - target: ${BUILDER_PORT:-443}
-        # will be replaced to 443 for production by script due to http://github.com/moby/moby/issues/35532#issuecomment-346753307
-        published: 8444
+        published: 443
         # http://docs.docker.com/engine/swarm/ingress/#bypass-the-routing-mesh
         mode: host
-    secrets: &SECRETS
+    secrets:
       # /etc/secrets instead of default /run/secrets because /run/secrets leads to unclear error on k8s (rancher)
       # tls.* names according to traefik/k8s nginx ingress controllers
       - source: builder.crt.v3
@@ -42,32 +24,11 @@ services:
     volumes:
       - type: tmpfs
         target: /builder-tmp
-    deploy:
-      endpoint_mode: dnsrr
-      # should be the only container per node
-      mode: global
-      placement:
-        constraints:
-          - node.labels.builder == true
-
-  router:
-    image: electronuserland/build-service-router
-    hostname: "{{.Node.ID}}-{{.Service.Name}}"
-    ports:
-      - target: 443
-        # will be replaced to 443 for production by script due to http://github.com/moby/moby/issues/35532#issuecomment-346753307
-        published: 8443
-        mode: host
-    secrets: *SECRETS
-    deploy:
-      # docker swarm shows error if some other container has `port mode: host` Swarm should handle this situation, but as workaround for now, just use dnsrr
-      endpoint_mode: dnsrr
-      placement:
-        constraints:
-          - node.labels.admin == true
+      - type: tmpfs
+        target: /embedded-etcd
 
 secrets:
   builder.crt.v3:
-    file: ./certs/bundle.crt
+    file: ./certs/node.crt
   builder.key.v1:
     file: ./certs/node.key
