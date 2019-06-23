@@ -8,7 +8,6 @@ services:
       - DEBUG
       - PREFERRED_IP_VERSION
       - USE_EMBEDDED_ETCD
-      - SNAP_DESTRUCTIVE_MODE
     ports:
       - target: ${BUILDER_PORT:-443}
         published: 443

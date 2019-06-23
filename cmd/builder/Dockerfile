@@ -22,7 +22,8 @@ RUN mkdir -p /snap/bin && echo "#!/bin/sh" > /snap/bin/snapcraft && \
 # rpm is required for FPM to build rpm package
 # libsecret-1-dev and libgnome-keyring-dev are required even for prebuild keytar
 # do not use  --no-install-recommends - because snapcraft will install with default flags (so, we should also do so to ensure to avoid fetching during build)
-RUN apt-get -qq install bsdtar lzip rpm unzip libopenjp2-tools \
+# binutils for deb (ar command)
+RUN apt-get -qq install bsdtar lzip rpm binutils libopenjp2-tools \
   # snap stage packages
   libnspr4 libnss3 libxss1 libappindicator3-1 libsecret-1-0 && \
   apt-mark hold libnspr4 libnss3 libxss1 libappindicator3-1 libsecret-1-0

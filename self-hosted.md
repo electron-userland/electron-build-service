@@ -1,17 +1,15 @@
-Linux is required, but you can use [multipass](https://github.com/CanonicalLtd/multipass) to run on macOS/Windows.
+To deploy, [kubernetes](https://kubernetes.io/) is used for security reasons. Linux is required, but you can use [multipass](https://github.com/CanonicalLtd/multipass) to run on macOS/Windows.
 
-To deploy, [kubernetes](https://kubernetes.io/) is used.
-
-To deploy you need to perform two steps: 
+Two steps:
 
 1. create kubernetes cluster,
 2. deploy service.
 
 ## Kubernetes Cluster Creation
 
-[microk8s](https://microk8s.io) is highly recommended and used in docs.
+[microk8s](https://microk8s.io) is highly recommended and used in this instruction.
 
-Please see [install-local-k8s.sh](scripts/install-local-k8s.sh) and execute this script (one-line command to copy and paste is not provided to ensure that you will not damage your machine if script will be maliciously replaced).
+Please see script [install-local-k8s.sh](scripts/install-local-k8s.sh) and execute it (one-line command to copy and paste is not provided to ensure that you will not damage your machine if script will be maliciously replaced).
 
 ## Deploy Build Service
 
@@ -19,7 +17,7 @@ Please see [install-local-k8s.sh](scripts/install-local-k8s.sh) and execute this
 
 # to ensure that microk8s is ready
 microk8s.status --wait-ready
-# service deployed to namespace named `build-service` 
+# service will be deployed to namespace `build-service` 
 curl -fsSL https://raw.githubusercontent.com/electron-userland/electron-build-service/master/k8s/generated/self-hosted.yaml | microk8s.kubectl --namespace=build-service apply -f - 
 
 ```
