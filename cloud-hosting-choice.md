@@ -1,4 +1,6 @@
-Servers hosted on [OVH](https://www.ovh.ie) Cloud VPS:
+**update** (document is not updated to reflect that now Scaleway is used because of [new services](https://blog.scaleway.com/2019/introducing-development-cloud-instances/)).
+
+Servers hosted on [Scaleway](https://www.scaleway.com/):
 
 * build servers.
 * router and other control services (Kubernetes).

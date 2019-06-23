@@ -9,6 +9,7 @@
       <w>multipass</w>
       <w>nginx</w>
       <w>papertrail</w>
+      <w>scaleway</w>
       <w>traefik</w>
       <w>xenial</w>
       <w>zstd</w>

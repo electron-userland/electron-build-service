@@ -56,5 +56,5 @@ Queue waiting is not predictable for now. In the future build agents will be sta
 
 Build time depends on target. 
 * AppImage — 10s. 
-* deb — 40s.
-* Snap — 25s (no custom stage packages).
+* deb — 10s.
+* Snap — 20s (no custom stage packages).

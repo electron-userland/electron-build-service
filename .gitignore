@@ -5,4 +5,6 @@ scripts/private
 vendor/
 .idea/workspace.xml
 
-k8s/overlays/single-node/tls.*
+/k8s/overlays/single-node/tls.*
+
+/k8s/generated/production.yaml
