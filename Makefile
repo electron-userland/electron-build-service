@@ -15,19 +15,25 @@ push-docker: docker
 
 # don't forget to do push-docker
 bundle:
-	./scripts/build-bundle.sh
+	./scripts/set-image-digest.sh
+	make create-self-hosted
+
+create-self-hosted:
+	# https://github.com/kubernetes-sigs/kustomize/issues/766
+	ln -f certs/tls.cert k8s/overlays/single-node/tls.cert
+	ln -f certs/tls.key k8s/overlays/single-node/tls.key
+	kustomize build k8s/overlays/single-node --output k8s/generated/self-hosted.yaml
 
 dev: docker
 	DEBUG=electron-builder SNAP_DESTRUCTIVE_MODE=true USE_EMBEDDED_ETCD=true BUILDER_HOST=0.0.0.0 docker-compose up --abort-on-container-exit --remove-orphans --renew-anon-volumes
 
-mp: builder
-	multipass launch --name build-service || true
+mp-local-cluster: builder
+	multipass launch --name build-service --cpus 4 18.04 || true
 
 	multipass umount build-service:/project || true
 	multipass mount . build-service:/project
 
-	multipass exec build-service /project/scripts/prepare-linux-host.sh
-	multipass exec build-service start.sh
+	multipass exec build-service /project/scripts/install-local-k8s.sh
 
 # https://github.com/rancher/cli/releases
 apply: bundle

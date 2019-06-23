@@ -4,6 +4,9 @@
       <w>balancer</w>
       <w>etcd</w>
       <w>gopool</w>
+      <w>kubernetic</w>
+      <w>microk</w>
+      <w>multipass</w>
       <w>nginx</w>
       <w>papertrail</w>
       <w>traefik</w>

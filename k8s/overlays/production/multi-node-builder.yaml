@@ -1,0 +1,17 @@
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: builder
+spec:
+  template:
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: builder
+                    operator: In
+                    values:
+                      - "true"

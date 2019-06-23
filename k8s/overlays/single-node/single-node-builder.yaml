@@ -1,0 +1,12 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: builder
+spec:
+  template:
+    spec:
+      containers:
+        - name: builder
+          env:
+            - name: BUILDER_HOST
+              value: "0.0.0.0"

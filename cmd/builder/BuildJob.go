@@ -101,6 +101,9 @@ func (t *BuildJob) doBuild(buildContext context.Context, jobStartTime time.Time)
 		"APP_BUILDER_TMP_DIR="+projectTempDir,
 		// we do cleanup in any case, no need to waste nodejs worker time
 		"TMP_DIR_MANAGER_ENSURE_REMOVED_ON_EXIT=false",
+		"FORCE_COLOR=0",
+		"USE_SYSTEM_MKSQUASHFS=true",
+		"SNAP_DESTRUCTIVE_MODE=true",
 	)
 	command.Dir = t.projectDir
 

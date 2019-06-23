@@ -8,7 +8,7 @@ Intended only for programmatic usage.
 
 Free public Electron Build Service is provided and used by [electron-builder](https://github.com/electron-userland/electron-builder) since 19.48.0.
 
-This readme contains information not about electron-build-server, but about free public electron build service. Self-hosted usage documentation can be added by request. 
+This readme contains information not about electron-build-server, but about free public electron build service. You can setup [self-hosted](./self-hosted.md) instance if needed. 
 
 ## Why
 

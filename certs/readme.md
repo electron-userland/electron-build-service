@@ -1,3 +1,3 @@
-Communication encrypted using SSL. electron-builder or another client of electron build service uses electron-build service own CA (certificate authority) to verify connection. Bundled CA certificate and build node key/certificate intended only for local testing or own local intranet deployment.
+Communication encrypted using SSL. electron-builder or another client of build service uses electron-build service own CA (certificate authority) to verify connection. Bundled CA certificate and build node key/certificate intended only for local testing or own local intranet deployment.
 
 See [How to act as a Certificate Authority](https://realtimelogic.com/blog/2014/05/How-to-act-as-a-Certificate-Authority-the-Easy-Way).

@@ -1,0 +1,12 @@
+bases:
+  - ../../base
+resources:
+  - namespace.yaml
+patchesStrategicMerge:
+  - single-node-builder.yaml
+  - builder-service-node-port.yaml
+secretGenerator:
+  - name: tls
+    files:
+      - tls.cert
+      - tls.key

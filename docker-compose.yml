@@ -17,7 +17,7 @@ services:
     secrets:
       # /etc/secrets instead of default /run/secrets because /run/secrets leads to unclear error on k8s (rancher)
       # tls.* names according to traefik/k8s nginx ingress controllers
-      - source: builder.crt.v3
+      - source: builder.crt.v1
         target: /etc/secrets/tls.cert
       - source: builder.key.v1
         target: /etc/secrets/tls.key
@@ -28,7 +28,7 @@ services:
         target: /embedded-etcd
 
 secrets:
-  builder.crt.v3:
-    file: ./certs/node.crt
+  builder.crt.v1:
+    file: ./certs/tls.cert
   builder.key.v1:
-    file: ./certs/node.key
+    file: ./certs/tls.key

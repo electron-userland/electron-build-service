@@ -1,4 +1,3 @@
----
 # must be daemon set because client downloads from server directly
 # it is possible to use special prefix for pod and use ingress but this huge complication doesn't worth, so, we just expose as host port
 apiVersion: apps/v1
@@ -14,21 +13,10 @@ spec:
     metadata:
       labels: *LABELS
     spec:
-      affinity:
-        nodeAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms:
-              - matchExpressions:
-                  - key: builder
-                    operator: In
-                    values:
-                      - "true"
       containers:
         - image: electronuserland/build-service-builder@sha256:f260611d709073f53263f4e8ec52f48a4aba890fc4e985388983f0dcce9bfd5e
           name: builder
           env:
-            - name: SNAP_DESTRUCTIVE_MODE
-              value: "true"
             - name: USE_EMBEDDED_ETCD
               value: "true"
           ports:
