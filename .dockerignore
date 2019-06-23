@@ -7,7 +7,7 @@ test
 docker-compose*
 scripts
 vendor
-stacks
+k8s
 
 node_modules/7zip-bin/linux/arm
 node_modules/7zip-bin/linux/arm64

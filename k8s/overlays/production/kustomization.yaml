@@ -1,5 +1,7 @@
 bases:
   - ../../base
+resources:
+  - logspout.yaml
 patchesStrategicMerge:
   - multi-node-builder.yaml
   - external-ips.yaml

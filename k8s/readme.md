@@ -19,7 +19,7 @@
     * name: `papertrail-destination`, 
     * key: `papertrail-destination`, 
     * value: `syslog+tls://logsN.papertrailapp.com:N?filter.name=k8s_builder_*` + (see [papertrail destination](https://papertrailapp.com/account/destinations)).
-5. Import `logspout.yaml`, `builder.yml`, `builder-service.yaml`. Or `make add-cluster-resources`.
+5. `make add-cluster-resources`.
 
 ## Notes
   * "Import" means using Rancher `Import YAML` action.

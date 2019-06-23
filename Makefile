@@ -40,9 +40,8 @@ apply: bundle
 	rancher kubectl apply -f k8s/builder.yaml
 
 add-cluster-resources: bundle
-	rancher kubectl apply -f k8s/logspout.yaml
-	rancher kubectl apply -f k8s/builder.yaml
-	rancher kubectl apply -f k8s/builder-service.yaml
+	# to see full effective definition: kustomize build k8s/overlays/production --output k8s/generated/production.yaml
+	rancher kubectl apply -k k8s/overlays/production
 
 update-deps:
 	go get -u ./cmd/builder
