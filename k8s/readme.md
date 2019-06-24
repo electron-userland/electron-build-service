@@ -6,6 +6,8 @@
     ingress: 
       provider: "none"
     ```
+   
+   Add label `builder=true` for every node where builder should be deployed.
 
 2. If not embedded etcd is used: Catalog Apps -> etcd-operator from Rancher Library (not from Helm).
 
@@ -20,6 +22,12 @@
     * key: `papertrail-destination`, 
     * value: `syslog+tls://logsN.papertrailapp.com:N?filter.name=k8s_builder_*` + (see [papertrail destination](https://papertrailapp.com/account/destinations)).
 5. `make add-cluster-resources`.
+
+## TLS
+
+Communication encrypted using SSL. electron-builder or another client of build service uses electron-build service own CA (certificate authority) to verify connection. Bundled CA certificate and build node key/certificate intended only for local testing or own local intranet deployment.
+
+See [How to act as a Certificate Authority](https://realtimelogic.com/blog/2014/05/How-to-act-as-a-Certificate-Authority-the-Easy-Way). Terraform is used to maintain build service CA, but project is private due to security reasons.
 
 ## Notes
   * "Import" means using Rancher `Import YAML` action.

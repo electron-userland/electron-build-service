@@ -7,11 +7,11 @@ builder:
 lint:
 	golangci-lint run
 
-docker: builder
+docker:
 	docker build -f cmd/builder/Dockerfile -t electronuserland/build-service-builder .
 
 push-docker: docker
-	docker push electronuserland/build-service-builder
+	docker push electronuserland/build-service-builder:latest
 
 # don't forget to do push-docker
 bundle:
@@ -19,13 +19,10 @@ bundle:
 	make create-self-hosted
 
 create-self-hosted:
-	# https://github.com/kubernetes-sigs/kustomize/issues/766
-	ln -f certs/tls.cert k8s/overlays/single-node/tls.cert
-	ln -f certs/tls.key k8s/overlays/single-node/tls.key
 	kustomize build k8s/overlays/single-node --output k8s/generated/self-hosted.yaml
 
-dev: docker
-	DEBUG=electron-builder SNAP_DESTRUCTIVE_MODE=true USE_EMBEDDED_ETCD=true BUILDER_HOST=0.0.0.0 docker-compose up --abort-on-container-exit --remove-orphans --renew-anon-volumes
+dev:
+	tilt up
 
 mp-local-cluster: builder
 	multipass launch --name build-service --cpus 4 18.04 || true
@@ -36,15 +33,13 @@ mp-local-cluster: builder
 	multipass exec build-service /project/scripts/install-local-k8s.sh
 
 # https://github.com/rancher/cli/releases
-apply: bundle
-	rancher kubectl apply -f k8s/builder.yaml
-
 add-cluster-resources: bundle
+	# to switch context if needed (https://rancher.com/docs/rancher/v2.x/en/cli/#project-selection): rancher context switch
 	# to see full effective definition: kustomize build k8s/overlays/production --output k8s/generated/production.yaml
 	rancher kubectl apply -k k8s/overlays/production
 
 update-deps:
-	go get -u ./cmd/builder
+	GOPROXY=https://proxy.golang.org go get -u ./cmd/builder
 	go mod tidy
 
 # rsync -r ~/Documents/electron-builder/packages/app-builder-lib/out/ ~/Documents/electron-build-service/node_modules/app-builder-lib/out

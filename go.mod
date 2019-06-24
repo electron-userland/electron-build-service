@@ -3,15 +3,15 @@ module github.com/electronuserland/electron-build-service
 go 1.12
 
 require (
-	github.com/apex/log v1.1.0
+	github.com/apex/log v1.1.1
 	github.com/coreos/bbolt v1.3.3 // indirect
 	github.com/coreos/etcd v3.3.13+incompatible
 	github.com/coreos/go-semver v0.3.0 // indirect
-	github.com/coreos/go-systemd v0.0.0-20190618135430-ff7011eec365 // indirect
+	github.com/coreos/go-systemd v0.0.0-20190620071333-e64a0ec8b42a // indirect
 	github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f
-	github.com/develar/app-builder v0.0.0-20190619105658-1392c772bdb5
-	github.com/develar/errors v0.8.2
-	github.com/develar/go-fs-util v2.0.1-0.20181113101504-f6630ccc0e93+incompatible
+	github.com/develar/app-builder v0.0.0-20190624165217-1c4bfb2ead71
+	github.com/develar/errors v0.9.0
+	github.com/develar/go-fs-util v0.0.0-20190620175131-69a2d4542206
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible // indirect
 	github.com/didip/tollbooth v4.0.0+incompatible
 	github.com/go-sql-driver/mysql v1.4.1
@@ -39,10 +39,11 @@ require (
 	go.uber.org/atomic v1.4.0
 	go.uber.org/multierr v1.1.0 // indirect
 	go.uber.org/zap v1.10.0
-	golang.org/x/crypto v0.0.0-20190618222545-ea8f1a30c443 // indirect
-	golang.org/x/net v0.0.0-20190619014844-b5b0513f8c1b
+	golang.org/x/crypto v0.0.0-20190621222207-cc06ce4a13d4 // indirect
+	golang.org/x/net v0.0.0-20190620200207-3b0461eec859
+	golang.org/x/sys v0.0.0-20190624142023-c5567b49c5d0 // indirect
 	golang.org/x/time v0.0.0-20190308202827-9d24e82272b4 // indirect
 	google.golang.org/appengine v1.6.1 // indirect
-	google.golang.org/genproto v0.0.0-20190611190212-a7e196e89fd3 // indirect
+	google.golang.org/genproto v0.0.0-20190620144150-6af8c5fc6601 // indirect
 	google.golang.org/grpc v1.21.1 // indirect
 )

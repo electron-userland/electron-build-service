@@ -3,21 +3,14 @@
 // Use of this source code is governed by the MIT license that can be
 // found in the LICENSE file in the root of the repository or at
 // https://raw.githubusercontent.com/icub3d/gop/master/LICENSE.
-
-// Package gopool implements a concurrent work processing model. It is
-// a similar to thread pools in other languages, but it uses
-// goroutines and channels. A pool is formed wherein several
-// goroutines get tasks from a channel. Various sources can be used to
-// schedule tasks and given some coordination gopools on various
-// systems can work from the same source.
 package gopool
 
 import (
 	"fmt"
+	"go.uber.org/atomic"
 	"sync"
 	"time"
 
-	"go.uber.org/atomic"
 	"go.uber.org/zap"
 	"golang.org/x/net/context"
 )
@@ -26,10 +19,7 @@ import (
 // The Stringer interface is used to aid in logging.
 type JobEntry interface {
 	fmt.Stringer
-	// Run performs the work for this task. When the context is done,
-	// processing should stop as soon as reasonably possible. Long
-	// running tasks should make sure it's watching the context's Done()
-	// channel.
+
 	GetRunnable(context.CancelFunc) Runnable
 }
 
@@ -45,16 +35,17 @@ type Runnable interface {
 // GoPool is a group of goroutines that work on Tasks. Each goroutine
 // gets work from a channel until the context signals that it's done.
 type GoPool struct {
-	name       string
-	jobChannel <-chan JobEntry
-	wg         sync.WaitGroup
-	context    context.Context
-
-	// channel to ask worker to exit (but not to abort running jobs)
-	closeChannel chan struct{}
+	name string
 
 	JobMaxTime      time.Duration
 	RunningJobCount atomic.Uint32
+
+	waitGroup  sync.WaitGroup
+	context    context.Context
+	jobChannel <-chan JobEntry
+
+	// channel to ask worker to exit (but not to abort running jobs)
+	closeChannel chan struct{}
 }
 
 // New creates a new GoPool with the given number of goroutines. The
@@ -68,14 +59,15 @@ type GoPool struct {
 // The src channel is where the goroutines look for tasks.
 func New(workerCount int, ctx context.Context, jobChannel <-chan JobEntry, logger *zap.Logger) *GoPool {
 	p := &GoPool{
-		jobChannel: jobChannel,
-		context:    ctx,
+		jobChannel:   jobChannel,
+		context:      ctx,
+		closeChannel: make(chan struct{}),
 	}
 
 	for x := 0; x < workerCount; x++ {
 		go p.worker(logger.With(zap.Int("worker", x)))
 	}
-	p.wg.Add(workerCount)
+	p.waitGroup.Add(workerCount)
 	return p
 }
 
@@ -91,7 +83,7 @@ func (t *GoPool) Done() chan struct{} {
 }
 
 func (t *GoPool) Wait() {
-	t.wg.Wait()
+	t.waitGroup.Wait()
 }
 
 // String implements the fmt.Stringer interface. It just prints the
@@ -107,7 +99,7 @@ func (t *GoPool) Close() {
 // Worker is the function each goroutine uses to get and perform tasks.
 // It stops when the stop channel is closed. It also stops if the source channel is closed but logs a message in addition.
 func (t *GoPool) worker(logger *zap.Logger) {
-	defer t.wg.Done()
+	defer t.waitGroup.Done()
 	var jobCancel context.CancelFunc
 
 	defer func() {

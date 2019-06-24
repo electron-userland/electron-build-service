@@ -58,7 +58,7 @@ func (t *AgentRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	_, _ = fmt.Fprintf(w, `{"endpoint": "https://%s"}`, agent.Address)
 }
 
-func configureRouter(logger *zap.Logger, disposer *Disposer) error {
+func configureRouter(logger *zap.Logger, disposer *Disposer) {
 	limit := tollbooth.NewLimiter(1, &limiter.ExpirableOptions{DefaultExpirationTTL: time.Hour})
 	limit.SetBurst(10)
 
@@ -70,8 +70,6 @@ func configureRouter(logger *zap.Logger, disposer *Disposer) error {
 		agentRegistry: a,
 		logger:        logger,
 	}))
-
-	return nil
 }
 
 func getWeight(agent agentRegistry.BuildAgent) int {

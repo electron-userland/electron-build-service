@@ -1,0 +1,13 @@
+linters:
+  enable-all: true
+  disable:
+    - golint
+    - gochecknoglobals
+    - prealloc
+    - gofmt
+    - lll
+    - bodyclose
+    - goimports
+    - goconst # todo
+    - gocritic # switch
+    - scopelint # reference from range var

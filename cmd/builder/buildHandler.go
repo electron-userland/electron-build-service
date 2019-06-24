@@ -3,15 +3,16 @@ package main
 import (
 	"bytes"
 	"context"
+	"github.com/develar/app-builder/pkg/electron"
 	"github.com/develar/app-builder/pkg/util"
 	"io"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
-	"github.com/apex/log"
 	"github.com/develar/errors"
 	"github.com/develar/go-fs-util"
 	"github.com/electronuserland/electron-build-service/internal/agentRegistry"
@@ -25,6 +26,7 @@ import (
 const queueCompleteTimeOut = 5 * time.Minute
 const maxRequestBody = 768 * 1024 * 1024
 const jobMaxTime = 30 * time.Minute
+const maxUploadTime = 1 * time.Hour
 
 type BuildHandler struct {
 	agentEntry *agentRegistry.AgentEntry
@@ -32,7 +34,7 @@ type BuildHandler struct {
 
 	queue              *gopool.ManagedSource
 	queueContextCancel context.CancelFunc
-	pool               gopool.GoPool
+	pool               *gopool.GoPool
 
 	stageDir string
 	tempDir  string
@@ -41,14 +43,13 @@ type BuildHandler struct {
 	scriptPath string
 }
 
-func (t *BuildHandler) CreateAndStartQueue(numWorkers int) error {
+func (t *BuildHandler) CreateAndStartQueue(numWorkers int) {
 	ctx, cancel := context.WithCancel(context.Background())
 	t.queueContextCancel = cancel
 	logger := t.logger.Named("queue")
 	t.queue = gopool.NewManagedSource(gopool.NewPriorityQueue(), ctx, logger)
-	jobPool := gopool.New(numWorkers, ctx, t.queue.Source, logger)
-	jobPool.JobMaxTime = jobMaxTime
-	return nil
+	t.pool = gopool.New(numWorkers, ctx, t.queue.Source, logger)
+	t.pool.JobMaxTime = jobMaxTime
 }
 
 func (t *BuildHandler) WaitTasksAreComplete() {
@@ -70,7 +71,7 @@ func (t *BuildHandler) WaitTasksAreComplete() {
 	case <-t.pool.Done():
 		t.logger.Info("tasks completed", zap.Duration("duration", time.Since(start)))
 	case <-stopTimer.C:
-		log.Warn("cannot wait all uncompleted tasks, abort all")
+		t.logger.Warn("cannot wait all uncompleted tasks, abort all")
 	}
 }
 
@@ -155,17 +156,19 @@ func (t *BuildHandler) HandleBuildRequest(w http.ResponseWriter, r *http.Request
 	}
 }
 
-func (t *BuildHandler) executeUnpackTarZstd(w http.ResponseWriter, r *http.Request, buildJob *BuildJob, projectDir string, ctx context.Context) error {
+func (t *BuildHandler) executeUnpackTarZstd(w http.ResponseWriter, r *http.Request, buildJob *BuildJob, projectDir string, parentContext context.Context) error {
+	unpackContext, cancel := context.WithTimeout(parentContext, maxUploadTime)
+	defer cancel()
+
 	start := time.Now()
-	err := t.unpackTarZstd(http.MaxBytesReader(w, r.Body, maxRequestBody), projectDir, ctx, buildJob.logger)
+	err := t.unpackTarZstd(http.MaxBytesReader(w, r.Body, maxRequestBody), projectDir, unpackContext, buildJob.logger)
 	if err != nil {
 		// do not wrap error, stack is clear
 		return err
 	}
 
-	elapsed := time.Since(start)
 	buildJob.logger.Info("uploaded and unpacked",
-		zap.Duration("elapsed", elapsed),
+		zap.Duration("elapsed", time.Since(start)),
 		zap.String("compressionLevel", r.Header.Get("x-zstd-compression-level")),
 	)
 
@@ -189,10 +192,13 @@ func (t *BuildHandler) doBuild(w http.ResponseWriter, r *http.Request, buildJob 
 
 	requestContext := r.Context()
 
-	unpackContext, cancelUnpack := context.WithCancel(context.Background())
-	err = t.executeUnpackTarZstd(w, r, buildJob, projectDir, unpackContext)
-	cancelUnpack()
-	cancelUnpack = nil
+	// must be unpacked before user files
+	err = t.unpackElectron(buildJob, projectDir)
+	if err != nil {
+		return err
+	}
+
+	err = t.executeUnpackTarZstd(w, r, buildJob, projectDir, requestContext)
 	if err != nil {
 		if requestContext.Err() == nil {
 			return err
@@ -210,8 +216,6 @@ func (t *BuildHandler) doBuild(w http.ResponseWriter, r *http.Request, buildJob 
 	if !ok {
 		return errors.New("cannot cast to Flusher")
 	}
-
-	jobId := buildJob.id
 
 	jsonWriter := jsoniter.NewStream(jsoniter.ConfigFastest, w, 16*1024)
 
@@ -237,11 +241,6 @@ func (t *BuildHandler) doBuild(w http.ResponseWriter, r *http.Request, buildJob 
 		case <-requestContext.Done():
 			logger.Debug("client closed connection")
 			if !isCompleted {
-				isCompleted = true
-				if cancelUnpack != nil {
-					cancelUnpack()
-				}
-
 				jobEntry.Cancel()
 			}
 			return nil
@@ -277,7 +276,7 @@ func (t *BuildHandler) doBuild(w http.ResponseWriter, r *http.Request, buildJob 
 			}
 
 			jsonWriter.Reset(w)
-			writeResultInfo(&result, jobId, jsonWriter)
+			writeResultInfo(&result, buildJob.id, jsonWriter)
 			err = flushJsonWriter()
 			if err != nil {
 				return err
@@ -285,6 +284,44 @@ func (t *BuildHandler) doBuild(w http.ResponseWriter, r *http.Request, buildJob 
 			// do not return - wait until client download artifacts and close connection
 		}
 	}
+}
+
+func (t *BuildHandler) unpackElectron(buildJob *BuildJob, projectDir string) error {
+	electronDownloadOptions := buildJob.buildRequest.ElectronDownload
+	if len(electronDownloadOptions.Version) == 0 {
+		return nil
+	}
+
+	executableName := buildJob.buildRequest.ExecutableName
+	if len(executableName) == 0 || strings.Contains(executableName, "/") || strings.Contains(executableName, "\\") {
+		return errors.New("executableName is invalid")
+	}
+
+	// unset unused options to ensure that will be not maliciously used
+	electronDownloadOptions.CacheDir = ""
+	electronDownloadOptions.CustomDir = ""
+	electronDownloadOptions.Mirror = ""
+
+	start := time.Now()
+
+	unpackDir := filepath.Join(projectDir, buildJob.buildRequest.Targets[0].UnpackedDirName)
+	err := electron.UnpackElectron([]electron.ElectronDownloadOptions{electronDownloadOptions}, unpackDir, "", true)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	err = os.Rename(filepath.Join(unpackDir, "electron"), filepath.Join(unpackDir, executableName))
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	t.logger.Debug("electron unpacked",
+		zap.String("version", electronDownloadOptions.Version),
+		zap.String("platform", electronDownloadOptions.Platform),
+		zap.String("arch", electronDownloadOptions.Arch),
+		zap.Duration("elapsed", time.Since(start)),
+	)
+	return nil
 }
 
 func (t *BuildHandler) updateAgentInfo(relativeValue uint32) {

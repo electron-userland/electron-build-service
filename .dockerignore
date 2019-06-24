@@ -4,9 +4,7 @@ test
 *.iml
 *.md
 .gitignore
-docker-compose*
 scripts
-vendor
 k8s
 
 node_modules/7zip-bin/linux/arm
@@ -26,4 +24,3 @@ package.json
 yarn.lock
 Gopkg.*
 .gometalinter.json
-internal

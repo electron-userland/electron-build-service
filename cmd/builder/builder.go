@@ -84,6 +84,8 @@ func start(logger *zap.Logger) error {
 		return errors.WithStack(err)
 	}
 
+	buildHandler.CreateAndStartQueue(runtime.NumCPU() + 1)
+
 	buildLimit := tollbooth.NewLimiter(1, &limiter.ExpirableOptions{DefaultExpirationTTL: time.Hour})
 	buildLimit.SetBurst(10)
 
@@ -93,11 +95,6 @@ func start(logger *zap.Logger) error {
 
 	http.Handle("/v2/build", tollbooth.LimitFuncHandler(buildLimit, buildHandler.HandleBuildRequest))
 	http.Handle(baseDownloadPath, tollbooth.LimitFuncHandler(downloadLimit, buildHandler.HandleDownloadRequest))
-
-	err = buildHandler.CreateAndStartQueue(runtime.NumCPU() + 1)
-	if err != nil {
-		return errors.WithStack(err)
-	}
 
 	port := internal.GetListenPort("BUILDER_PORT")
 	server := internal.ListenAndServe(port, logger)
@@ -110,10 +107,7 @@ func start(logger *zap.Logger) error {
 		return errors.WithStack(err)
 	}
 
-	err = configureRouter(logger, disposer)
-	if err != nil {
-		return errors.WithStack(err)
-	}
+	configureRouter(logger, disposer)
 
 	logger.Info("started",
 		zap.String("port", port),

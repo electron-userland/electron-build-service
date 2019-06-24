@@ -72,7 +72,7 @@ func (t *BuildJob) doBuild(buildContext context.Context, jobStartTime time.Time)
 	defer func() {
 		r := recover()
 		if r != nil {
-			t.complete <- BuildJobResult{error: errors.Errorf("recovered", r)}
+			t.complete <- BuildJobResult{error: errors.Errorf("recovered %v", r)}
 		}
 	}()
 
