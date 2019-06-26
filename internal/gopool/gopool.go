@@ -20,7 +20,12 @@ import (
 type JobEntry interface {
 	fmt.Stringer
 
-	GetRunnable(context.CancelFunc) Runnable
+	Priority() int
+
+	// can be called several times
+	Cancel()
+
+	Run(jobContext context.Context, cancelFunc context.CancelFunc)
 }
 
 type Runnable interface {
@@ -37,42 +42,58 @@ type Runnable interface {
 type GoPool struct {
 	name string
 
-	JobMaxTime      time.Duration
-	RunningJobCount atomic.Uint32
+	JobMaxTime time.Duration
 
-	waitGroup  sync.WaitGroup
-	context    context.Context
-	jobChannel <-chan JobEntry
+	pendingJobCount atomic.Uint32
+	runningJobCount atomic.Uint32
+
+	waitGroup sync.WaitGroup
+	context   context.Context
 
 	// channel to ask worker to exit (but not to abort running jobs)
 	closeChannel chan struct{}
+
+	queue *ManagedSource
+
+	closeOnce sync.Once
 }
 
-// New creates a new GoPool with the given number of goroutines. The
-// name is used for logging purposes. The goroutines are started as
-// part of calling New().
+func (t *GoPool) AddJob(job Runnable, priority int) JobEntry {
+	jobEntry := newJob(job, priority)
+	t.queue.add <- jobEntry
+	return jobEntry
+}
+
+func (t *GoPool) GetPendingJobCount() uint32 {
+	return t.queue.pendingJobCount.Load()
+}
+
+func (t *GoPool) GetRunningJobCount() uint32 {
+	return t.runningJobCount.Load()
+}
+
+// New creates a new GoPool with the given number of goroutines.
+// The goroutines are started as part of calling New().
 //
 // The goroutines will stop when the given context is done. If you
 // want to make sure all of the tasks have got the signal and stopped
 // cleanly, you should use Wait().
-//
-// The src channel is where the goroutines look for tasks.
-func New(workerCount int, ctx context.Context, jobChannel <-chan JobEntry, logger *zap.Logger) *GoPool {
-	p := &GoPool{
-		jobChannel:   jobChannel,
+func New(workerCount int, ctx context.Context, logger *zap.Logger) *GoPool {
+	managedSource := newManagedSource(NewPriorityQueue(), ctx, logger)
+	pool := &GoPool{
 		context:      ctx,
 		closeChannel: make(chan struct{}),
+		queue:        managedSource,
 	}
 
-	for x := 0; x < workerCount; x++ {
-		go p.worker(logger.With(zap.Int("worker", x)))
+	for index := 0; index < workerCount; index++ {
+		go pool.worker(logger.With(zap.Int("worker", index)))
 	}
-	p.waitGroup.Add(workerCount)
-	return p
+	pool.waitGroup.Add(workerCount)
+	return pool
 }
 
-// Done returns channel until all of the workers have stopped. This won'job ever
-// return if the context for this gopool is never done.
+// Done returns channel until all of the workers have stopped. This won'job ever return if the context for this gopool is never done.
 func (t *GoPool) Done() chan struct{} {
 	c := make(chan struct{})
 	go func() {
@@ -86,64 +107,79 @@ func (t *GoPool) Wait() {
 	t.waitGroup.Wait()
 }
 
-// String implements the fmt.Stringer interface. It just prints the
-// name given to New().
+// String implements the fmt.Stringer interface. It just prints the name given to New().
 func (t *GoPool) String() string {
 	return t.name
 }
 
 func (t *GoPool) Close() {
-	close(t.closeChannel)
+	t.closeOnce.Do(func() {
+		// close queue to not accept new jobs
+		close(t.queue.add)
+		close(t.closeChannel)
+	})
 }
 
 // Worker is the function each goroutine uses to get and perform tasks.
 // It stops when the stop channel is closed. It also stops if the source channel is closed but logs a message in addition.
 func (t *GoPool) worker(logger *zap.Logger) {
 	defer t.waitGroup.Done()
-	var jobCancel context.CancelFunc
-
-	defer func() {
-		if jobCancel != nil {
-			jobCancel()
-			jobCancel = nil
-		}
-	}()
 
 	for {
 		select {
 		case <-t.closeChannel:
-			logger.Debug("pool closed: stopping")
+			logger.Debug("stopping", zap.String("reason", "pool closed"))
 			return
 		case <-t.context.Done():
-			logger.Debug("stop channel closed: stopping")
+			logger.Debug("stopping", zap.String("reason", "stop channel closed"))
 			return
-		case job, ok := <-t.jobChannel:
+		case job, ok := <-t.queue.source:
 			if !ok {
-				logger.Debug("input source closed: stopping")
+				logger.Debug("stopping", zap.String("reason", "input source closed"))
 				return
 			}
 
-			if t.context.Err() != nil {
+			contextError := t.context.Err()
+			if contextError != nil {
+				logger.Debug("stopping", zap.NamedError("reason", contextError))
 				return
 			}
 
-			var jobContext context.Context
-			logger.Debug("starting job", zap.Stringer("job", job))
-			jobContext, jobCancel = context.WithTimeout(t.context, t.JobMaxTime)
-
-			runnable := job.GetRunnable(jobCancel)
-			if runnable == nil {
-				logger.Debug("job is cancelled", zap.Stringer("job", job))
-				continue
-			}
-
-			start := time.Now()
-			t.RunningJobCount.Inc()
-			runnable.Run(jobContext)
-			t.RunningJobCount.Dec()
-			jobCancel()
-			jobCancel = nil
-			logger.Debug("finished job", zap.Stringer("job", job), zap.Duration("duration", time.Since(start)))
+			t.executeJob(logger.With(zap.Stringer("job", job)), job)
 		}
 	}
+}
+
+func (t *GoPool) executeJob(logger *zap.Logger, job JobEntry) {
+	logger.Debug("starting job")
+	jobContext, jobCancel := context.WithTimeout(t.context, t.JobMaxTime)
+
+	start := time.Now()
+
+	var closeOnce sync.Once
+
+	cancelFuncWrapper := func() {
+		closeOnce.Do(func() {
+			t.runningJobCount.Dec()
+			isCancelled := jobContext.Err() != nil
+
+			defer func() {
+				if logger.Core().Enabled(zap.DebugLevel) {
+					var suffix string
+					if isCancelled {
+						suffix = "cancelled"
+					} else {
+						suffix = "finished"
+					}
+					logger.Debug("job "+suffix, zap.Duration("duration", time.Since(start)))
+				}
+			}()
+
+			jobCancel()
+		})
+	}
+
+	t.runningJobCount.Inc()
+	defer cancelFuncWrapper()
+	job.Run(jobContext, cancelFuncWrapper)
 }

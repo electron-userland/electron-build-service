@@ -23,7 +23,7 @@ import (
 	"go.uber.org/zap"
 )
 
-const queueCompleteTimeOut = 5 * time.Minute
+const queueCompleteTimeOut = 1 * time.Minute
 const maxRequestBody = 768 * 1024 * 1024
 const jobMaxTime = 30 * time.Minute
 const maxUploadTime = 1 * time.Hour
@@ -32,9 +32,8 @@ type BuildHandler struct {
 	agentEntry *agentRegistry.AgentEntry
 	logger     *zap.Logger
 
-	queue              *gopool.ManagedSource
-	queueContextCancel context.CancelFunc
-	pool               *gopool.GoPool
+	queueCancel context.CancelFunc
+	pool        *gopool.GoPool
 
 	stageDir string
 	tempDir  string
@@ -45,10 +44,9 @@ type BuildHandler struct {
 
 func (t *BuildHandler) CreateAndStartQueue(numWorkers int) {
 	ctx, cancel := context.WithCancel(context.Background())
-	t.queueContextCancel = cancel
+	t.queueCancel = cancel
 	logger := t.logger.Named("queue")
-	t.queue = gopool.NewManagedSource(gopool.NewPriorityQueue(), ctx, logger)
-	t.pool = gopool.New(numWorkers, ctx, t.queue.Source, logger)
+	t.pool = gopool.New(numWorkers, ctx, logger)
 	t.pool.JobMaxTime = jobMaxTime
 }
 
@@ -56,12 +54,10 @@ func (t *BuildHandler) WaitTasksAreComplete() {
 	t.logger.Info("wait until all tasks are completed", zap.Duration("timeout", queueCompleteTimeOut))
 
 	// defer context cancelling
-	defer t.queueContextCancel()
+	defer t.queueCancel()
 
 	start := time.Now()
-	// close queue to not accept new jobs
-	t.queue.Close()
-	// close pool to to ask workers to exit as soon as possible
+	// close pool to to ask workers to exit as soon as possible and close queue to not accept new jobs
 	t.pool.Close()
 
 	stopTimer := time.NewTimer(queueCompleteTimeOut)
@@ -209,8 +205,9 @@ func (t *BuildHandler) doBuild(w http.ResponseWriter, r *http.Request, buildJob 
 	}
 
 	buildJob.queueAddTime = time.Now()
-	jobEntry := gopool.NewJob(buildJob, 0)
-	t.queue.Add <- jobEntry
+	jobEntry := t.pool.AddJob(buildJob, 0)
+
+	defer jobEntry.Cancel()
 
 	flusher, ok := w.(http.Flusher)
 	if !ok {
@@ -224,7 +221,6 @@ func (t *BuildHandler) doBuild(w http.ResponseWriter, r *http.Request, buildJob 
 		err := jsonWriter.Flush()
 		if err != nil {
 			logger.Error("abort job on message write error")
-			jobEntry.Cancel()
 			return err
 		}
 
@@ -240,9 +236,6 @@ func (t *BuildHandler) doBuild(w http.ResponseWriter, r *http.Request, buildJob 
 		select {
 		case <-requestContext.Done():
 			logger.Debug("client closed connection")
-			if !isCompleted {
-				jobEntry.Cancel()
-			}
 			return nil
 
 		case <-ticker.C:
@@ -268,7 +261,11 @@ func (t *BuildHandler) doBuild(w http.ResponseWriter, r *http.Request, buildJob 
 				return err
 			}
 
-		case result := <-buildJob.complete:
+		case result, ok := <-buildJob.complete:
+			if !ok {
+				continue
+			}
+
 			isCompleted = true
 			logger.Debug("complete received", zap.Error(result.error))
 			if result.error != nil {
@@ -325,8 +322,8 @@ func (t *BuildHandler) unpackElectron(buildJob *BuildJob, projectDir string) err
 }
 
 func (t *BuildHandler) updateAgentInfo(relativeValue uint32) {
-	pending := t.queue.PendingJobCount.Load()
-	running := t.pool.RunningJobCount.Load()
+	pending := t.pool.GetPendingJobCount()
+	running := t.pool.GetRunningJobCount()
 	t.logger.Debug("queue stat", zap.Uint32("pending", pending), zap.Uint32("running", running))
 	count := pending + running + relativeValue
 	t.agentEntry.Update(int(count) /* our job */)

@@ -7,7 +7,7 @@
 package gopool
 
 import (
-			"reflect"
+	"reflect"
 	"sort"
 	"strconv"
 	"sync"
@@ -15,70 +15,55 @@ import (
 	"time"
 
 	"github.com/electronuserland/electron-build-service/internal"
-	"go.uber.org/zap"
 	"golang.org/x/net/context"
 )
 
 func TestGoPool(t *testing.T) {
 	var l sync.Mutex
 	var items []int
-	var exp []int
 	ai := func(i int) {
 		l.Lock()
 		defer l.Unlock()
 		items = append(items, i)
 	}
 
-	queue := NewPriorityQueue()
 	ctx, cancel := context.WithCancel(context.Background())
 
 	logger := internal.CreateLogger()
 
-	managedSource := NewManagedSource(queue, ctx, logger)
-	pool := New(5, ctx, managedSource.Source, logger)
+	pool := New(5, ctx, logger)
 
+	var exp []int
 	// Add a bunch of tasks and wait for them to finish.
 	for x := 0; x < 500; x++ {
-		managedSource.Add <- NewJob(&tt{f: ai, i: x}, 0)
+		pool.AddJob(&tt{f: ai, i: x}, 0)
 		exp = append(exp, x)
 	}
-	for managedSource.PendingJobCount.Load() > 1 {
+
+	for pool.GetPendingJobCount() > 1 {
 		time.Sleep(20 * time.Millisecond)
 	}
+
 	for x := 500; x < 1000; x++ {
-		managedSource.Add <- NewJob(&tt{f: ai, i: x}, 0)
+		pool.AddJob(&tt{f: ai, i: x}, 0)
 		exp = append(exp, x)
 	}
-	for queue.q.Len() > 1 {
+
+	for pool.GetRunningJobCount() > 1 {
 		time.Sleep(20 * time.Millisecond)
 	}
+
+	pool.Close()
+	pool.Wait()
 
 	// cleanup
 	cancel()
-	pool.Wait()
 
 	// Verify the list.
 	sort.Ints(items)
 	if !reflect.DeepEqual(items, exp) {
 		t.Errorf("Didn'job get all the items expected: %v, %v", len(items), len(exp))
 	}
-}
-
-func TestGoPoolInputSourceClosed(t *testing.T) {
-	src := make(chan JobEntry)
-	logger, err := zap.NewDevelopment()
-	if err != nil {
-		t.Error(err)
-		return
-	}
-
-	pool := New(5, context.Background(), src, logger)
-
-	close(src)
-	time.Sleep(10 * time.Millisecond)
-
-	// Cleanup
-	pool.Wait()
 }
 
 type tt struct {

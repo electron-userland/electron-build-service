@@ -119,7 +119,7 @@ func start(logger *zap.Logger) error {
 		zap.Strings("env", os.Environ()),
 	)
 
-	internal.WaitUntilTerminated(server, 4*time.Minute, func() {
+	internal.WaitUntilTerminated(server, 1*time.Minute, func() {
 		// remove agent entry before server shutdown (as early as possible)
 		disposer.Dispose()
 	}, logger)

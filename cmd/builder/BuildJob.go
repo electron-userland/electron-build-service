@@ -11,6 +11,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
+	"syscall"
 	"time"
 
 	"github.com/develar/errors"
@@ -38,8 +40,6 @@ type BuildJob struct {
 	complete chan BuildJobResult
 
 	logger *zap.Logger
-
-	context context.Context
 }
 
 type BuildJobResult struct {
@@ -55,16 +55,20 @@ func (t *BuildJob) String() string {
 }
 
 func (t *BuildJob) Run(ctx context.Context) {
-	t.context = ctx
-
 	jobStartTime := time.Now()
 	waitTime := jobStartTime.Sub(t.queueAddTime)
 	t.logger.Info("job started", zap.Duration("waitTime", waitTime))
 	t.messages <- fmt.Sprintf("job started (queue time: %s)", waitTime.Round(time.Millisecond))
 
 	err := t.doBuild(ctx, jobStartTime)
+
+	if ctx.Err() != nil {
+		close(t.complete)
+		return
+	}
+
 	if err != nil {
-		t.complete <- BuildJobResult{error: errors.WithStack(err)}
+		t.complete <- BuildJobResult{error: err}
 	}
 }
 
@@ -75,6 +79,10 @@ func (t *BuildJob) doBuild(buildContext context.Context, jobStartTime time.Time)
 			t.complete <- BuildJobResult{error: errors.Errorf("recovered %v", r)}
 		}
 	}()
+
+	if buildContext.Err() != nil {
+		return nil
+	}
 
 	// where electron-builder creates temp files
 	projectTempDir := filepath.Join(t.handler.tempDir, t.id)
@@ -91,7 +99,7 @@ func (t *BuildJob) doBuild(buildContext context.Context, jobStartTime time.Time)
 	}
 
 	if buildContext.Err() != nil {
-		return buildContext.Err()
+		return nil
 	}
 
 	command := exec.CommandContext(buildContext, "node", t.handler.scriptPath, *t.rawBuildRequest)
@@ -112,13 +120,14 @@ func (t *BuildJob) doBuild(buildContext context.Context, jobStartTime time.Time)
 	}
 
 	if buildContext.Err() != nil {
-		return buildContext.Err()
+		return nil
 	}
 
 	// reliable way to get result (since we cannot use out/err output)
 	rawResult, err := ioutil.ReadFile(filepath.Join(projectTempDir, "__build-result.json"))
 	if err != nil {
-		return errors.WithStack(err)
+		close(t.complete)
+		return nil
 	}
 
 	info, err := ioutil.ReadFile(filepath.Join(t.projectDir, "info.json"))
@@ -262,13 +271,20 @@ func (t *BuildJob) removeAllFilesExceptArtifacts(projectTempDir string) {
 			continue
 		}
 
-		removeFileAndLog(t.logger, file)
+		removeFileAndLog(t.logger, filepath.Join(t.projectDir, file))
 	}
 }
 
 func removeFileAndLog(logger *zap.Logger, file string) {
 	logger.Debug("remove file", zap.String("file", file))
-	err := os.RemoveAll(file)
+
+	var err error
+	if strings.HasSuffix(file, ".json") {
+		err = syscall.Unlink(file)
+	} else {
+		err = os.RemoveAll(file)
+	}
+
 	if err != nil {
 		logger.Error("cannot remove", zap.Error(err))
 	}

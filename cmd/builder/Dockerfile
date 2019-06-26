@@ -23,10 +23,9 @@ ENV DEBIAN_FRONTEND noninteractive
 # Grab the core snap from the stable channel and unpack it in the proper place
 RUN apt-get update -qq && apt-get dist-upgrade -qq && apt-get install -qq jq squashfs-tools && \
   curl -L $(curl -H 'X-Ubuntu-Series: 16' 'https://api.snapcraft.io/api/v1/snaps/details/core' | jq '.download_url' -r) --output core.snap && mkdir -p /snap/core && unsquashfs -d /snap/core/current core.snap && \
-  curl -L $(curl -H 'X-Ubuntu-Series: 16' 'https://api.snapcraft.io/api/v1/snaps/details/snapcraft?channel=stable' | jq '.download_url' -r) --output snapcraft.snap && mkdir -p /snap/snapcraft && unsquashfs -d /snap/snapcraft/current snapcraft.snap
-
-# Create a snapcraft runner
-RUN mkdir -p /snap/bin && echo "#!/bin/sh" > /snap/bin/snapcraft && \
+  curl -L $(curl -H 'X-Ubuntu-Series: 16' 'https://api.snapcraft.io/api/v1/snaps/details/snapcraft?channel=stable' | jq '.download_url' -r) --output snapcraft.snap && mkdir -p /snap/snapcraft && unsquashfs -d /snap/snapcraft/current snapcraft.snap && \
+  # Create a snapcraft runner
+  mkdir -p /snap/bin && echo "#!/bin/sh" > /snap/bin/snapcraft && \
   snap_version="$(awk '/^version:/{print $2}' /snap/snapcraft/current/meta/snap.yaml)" && echo "export SNAP_VERSION=\"$snap_version\"" >> /snap/bin/snapcraft && \
   echo 'exec "$SNAP/usr/bin/python3" "$SNAP/bin/snapcraft" "$@"' >> /snap/bin/snapcraft && \
   chmod +x /snap/bin/snapcraft

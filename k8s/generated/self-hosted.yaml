@@ -46,7 +46,7 @@ spec:
           value: 0.0.0.0
         - name: USE_EMBEDDED_ETCD
           value: "true"
-        image: electronuserland/build-service-builder@sha256:8941995099f1fe56fa78a7067b0c2c45829adc9bb96b01c9cc0349759e1bca4c
+        image: electronuserland/build-service-builder@sha256:86014f240aaab96a79e338385b9a4a479a9127fe26c535f8493572c3ae7456ba
         livenessProbe:
           failureThreshold: 3
           httpGet:

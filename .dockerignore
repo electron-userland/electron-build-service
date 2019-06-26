@@ -22,5 +22,5 @@ node_modules/app-builder-bin/win
 Makefile
 package.json
 yarn.lock
-Gopkg.*
-.gometalinter.json
+out/
+.golangci.yml

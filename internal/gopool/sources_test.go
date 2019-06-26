@@ -29,11 +29,11 @@ func TestNewSource(t *testing.T) {
 		return
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	ms := NewManagedSource(pq, ctx, logger)
+	ms := newManagedSource(pq, ctx, logger)
 
 	// Make sure the top is not job selecting.
 	select {
-	case c, ok := <-ms.Source:
+	case c, ok := <-ms.source:
 		t.Errorf("got task from empty: %v %v", ok, c)
 	default:
 	}
@@ -41,15 +41,15 @@ func TestNewSource(t *testing.T) {
 	time.Sleep(20 * time.Millisecond)
 
 	// add two items
-	ms.Add <- NewJob(&sct{name: "first"}, 5)
-	ms.Add <- NewJob(&sct{name: "third"}, 7)
-	ms.Add <- NewJob(&sct{name: "second"}, 10)
+	ms.add <- newJob(&sct{name: "first"}, 5)
+	ms.add <- newJob(&sct{name: "third"}, 7)
+	ms.add <- newJob(&sct{name: "second"}, 10)
 	// close the add
-	ms.Close()
+	close(ms.add)
 	time.Sleep(20 * time.Millisecond)
 
 	// get one item
-	c := <-ms.Source
+	c := <-ms.source
 	if c.String() != "first" {
 		t.Errorf("Didn'job get first task.")
 	}
@@ -66,9 +66,9 @@ func TestNewSource(t *testing.T) {
 func TestPriorityTask(t *testing.T) {
 	buf := &bytes.Buffer{}
 	c := &sct{name: "test", w: buf}
-	pt := NewJob(c, 42)
+	pt := newJob(c, 42)
 	ctx := context.Background()
-	pt.GetRunnable(nil).Run(ctx)
+	pt.Run(ctx, func() {})
 	if c.ctx != ctx {
 		t.Errorf("context didn'job work.")
 	}
@@ -93,8 +93,8 @@ func TestPriorityQueue(t *testing.T) {
 
 	// Add one and get it.
 	c := &sct{name: "test"}
-	q.Add(NewJob(c, 0))
-	p := q.Next().(PriorityJob)
+	q.Add(newJob(c, 0))
+	p := q.Next().(JobEntry)
 	if p.Priority() != 0 {
 		t.Fatalf("non-PriorityJob was given a non-zero priority: %v", p.Priority())
 	}
@@ -109,14 +109,14 @@ func TestPriorityQueue(t *testing.T) {
 	// Add a bunch and make sure we get them back in the right order.
 	buf := &bytes.Buffer{}
 	for x := 0; x < 10; x += 2 {
-		q.Add(NewJob(&sct{name: strconv.Itoa(x), w: buf}, x))
+		q.Add(newJob(&sct{name: strconv.Itoa(x), w: buf}, x))
 	}
 	for x := 1; x < 10; x += 2 {
-		q.Add(NewJob(&sct{name: strconv.Itoa(x), w: buf}, x))
+		q.Add(newJob(&sct{name: strconv.Itoa(x), w: buf}, x))
 	}
 	// Read them all back and run them.
 	for c := q.Next(); c != nil; c = q.Next() {
-		c.GetRunnable(nil).Run(context.Background())
+		c.Run(context.Background(), func() {})
 	}
 	if buf.String() != "9876543210" {
 		t.Errorf("priority wasn'job properly applied. Expected 9876543210, but got %v", buf.String())
