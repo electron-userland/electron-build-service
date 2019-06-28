@@ -42,20 +42,20 @@ type Runnable interface {
 type GoPool struct {
 	name string
 
-	JobMaxTime time.Duration
-
-	pendingJobCount atomic.Uint32
-	runningJobCount atomic.Uint32
-
-	waitGroup sync.WaitGroup
+	waitGroup *sync.WaitGroup
 	context   context.Context
-
-	// channel to ask worker to exit (but not to abort running jobs)
-	closeChannel chan struct{}
 
 	queue *ManagedSource
 
+	pendingJobCount *atomic.Int32
+	runningJobCount *atomic.Int32
+
+	JobMaxTime time.Duration
+
 	closeOnce sync.Once
+
+	// channel to ask worker to exit (but not to abort running jobs)
+	closeChannel chan struct{}
 }
 
 func (t *GoPool) AddJob(job Runnable, priority int) JobEntry {
@@ -64,12 +64,12 @@ func (t *GoPool) AddJob(job Runnable, priority int) JobEntry {
 	return jobEntry
 }
 
-func (t *GoPool) GetPendingJobCount() uint32 {
-	return t.queue.pendingJobCount.Load()
+func (t *GoPool) GetPendingJobCount() int {
+	return int(t.queue.pendingJobCount.Load())
 }
 
-func (t *GoPool) GetRunningJobCount() uint32 {
-	return t.runningJobCount.Load()
+func (t *GoPool) GetRunningJobCount() int {
+	return int(t.runningJobCount.Load())
 }
 
 // New creates a new GoPool with the given number of goroutines.
@@ -84,12 +84,14 @@ func New(workerCount int, ctx context.Context, logger *zap.Logger) *GoPool {
 		context:      ctx,
 		closeChannel: make(chan struct{}),
 		queue:        managedSource,
+
+		pendingJobCount: atomic.NewInt32(0),
+		runningJobCount: atomic.NewInt32(0),
 	}
 
 	for index := 0; index < workerCount; index++ {
 		go pool.worker(logger.With(zap.Int("worker", index)))
 	}
-	pool.waitGroup.Add(workerCount)
 	return pool
 }
 
@@ -123,19 +125,24 @@ func (t *GoPool) Close() {
 // Worker is the function each goroutine uses to get and perform tasks.
 // It stops when the stop channel is closed. It also stops if the source channel is closed but logs a message in addition.
 func (t *GoPool) worker(logger *zap.Logger) {
-	defer t.waitGroup.Done()
+	t.waitGroup.Add(1)
+	stopReason := "unknown"
+	defer func() {
+		t.waitGroup.Done()
+		logger.Debug("stopping", zap.String("reason", stopReason))
+	}()
 
 	for {
 		select {
 		case <-t.closeChannel:
-			logger.Debug("stopping", zap.String("reason", "pool closed"))
+			stopReason = "pool closed"
 			return
 		case <-t.context.Done():
-			logger.Debug("stopping", zap.String("reason", "stop channel closed"))
+			stopReason = "stop channel closed"
 			return
 		case job, ok := <-t.queue.source:
 			if !ok {
-				logger.Debug("stopping", zap.String("reason", "input source closed"))
+				stopReason = "input source closed"
 				return
 			}
 

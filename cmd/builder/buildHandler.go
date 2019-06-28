@@ -5,12 +5,15 @@ import (
 	"context"
 	"github.com/develar/app-builder/pkg/electron"
 	"github.com/develar/app-builder/pkg/util"
+	"go.uber.org/atomic"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/develar/errors"
@@ -40,6 +43,10 @@ type BuildHandler struct {
 
 	zstdPath   string
 	scriptPath string
+
+	// don't use gopool running count because at the moment when we update agent entry,
+	// job can be not yet completed (so, for gopool job is still running, but for us already completed)
+	runningJobCount *atomic.Int32
 }
 
 func (t *BuildHandler) CreateAndStartQueue(numWorkers int) {
@@ -157,10 +164,28 @@ func (t *BuildHandler) executeUnpackTarZstd(w http.ResponseWriter, r *http.Reque
 	defer cancel()
 
 	start := time.Now()
-	err := t.unpackTarZstd(http.MaxBytesReader(w, r.Body, maxRequestBody), projectDir, unpackContext, buildJob.logger)
+	body := r.Body
+	err := t.unpackTarZstd(http.MaxBytesReader(w, body, maxRequestBody), projectDir, unpackContext)
+	closeError := body.Close()
+	// do not log ErrUnexpectedEOF - it means that client closed connection during upload
+	if closeError != nil && closeError != os.ErrClosed && err != io.ErrUnexpectedEOF {
+		logField := zap.Error(err)
+		if opErr, ok := err.(*net.OpError); ok {
+			if syscallErr, ok := opErr.Err.(*os.SyscallError); ok {
+				if syscallErr.Err == syscall.ECONNRESET {
+					logField = zap.String("reason", "connection reset by peer")
+				}
+			}
+		}
+		buildJob.logger.Error("cannot close", logField)
+	}
+
 	if err != nil {
 		// do not wrap error, stack is clear
 		return err
+	}
+	if closeError != nil {
+		return closeError
 	}
 
 	buildJob.logger.Info("uploaded and unpacked",
@@ -180,9 +205,16 @@ func (t *BuildHandler) doBuild(w http.ResponseWriter, r *http.Request, buildJob 
 
 	logger := buildJob.logger
 
-	t.updateAgentInfo(1)
+	t.updateAgentInfo(int(t.runningJobCount.Inc()))
+	jobCountUpdated := false
+
 	defer func() {
-		go t.updateAgentInfo(0)
+		if !jobCountUpdated {
+			running := int(t.runningJobCount.Dec())
+			jobCountUpdated = true
+			t.updateAgentInfo(running)
+		}
+
 		go removeFileAndLog(logger, projectDir)
 	}()
 
@@ -262,11 +294,12 @@ func (t *BuildHandler) doBuild(w http.ResponseWriter, r *http.Request, buildJob 
 			}
 
 		case result, ok := <-buildJob.complete:
-			if !ok {
+			if !ok || isCompleted {
 				continue
 			}
 
 			isCompleted = true
+
 			logger.Debug("complete received", zap.Error(result.error))
 			if result.error != nil {
 				return err
@@ -279,6 +312,11 @@ func (t *BuildHandler) doBuild(w http.ResponseWriter, r *http.Request, buildJob 
 				return err
 			}
 			// do not return - wait until client download artifacts and close connection
+
+			// mark job as completed before download complete to inform that agent is free to build more
+			running := int(t.runningJobCount.Dec())
+			jobCountUpdated = true
+			t.updateAgentInfo(running)
 		}
 	}
 }
@@ -321,12 +359,11 @@ func (t *BuildHandler) unpackElectron(buildJob *BuildJob, projectDir string) err
 	return nil
 }
 
-func (t *BuildHandler) updateAgentInfo(relativeValue uint32) {
+func (t *BuildHandler) updateAgentInfo(running int) {
 	pending := t.pool.GetPendingJobCount()
-	running := t.pool.GetRunningJobCount()
-	t.logger.Debug("queue stat", zap.Uint32("pending", pending), zap.Uint32("running", running))
-	count := pending + running + relativeValue
-	t.agentEntry.Update(int(count) /* our job */)
+
+	t.logger.Debug("queue stat", zap.Int("pending", pending), zap.Int("running", running), zap.Int("jobPoolRunning", t.pool.GetRunningJobCount()))
+	t.agentEntry.Update(pending + running /* our job */)
 }
 
 func writeStatus(message string, jsonWriter *jsoniter.Stream) {
@@ -372,15 +409,7 @@ func writeResultInfo(result *BuildJobResult, jobId string, jsonWriter *jsoniter.
 	jsonWriter.WriteObjectEnd()
 }
 
-func (t *BuildHandler) unpackTarZstd(reader io.ReadCloser, unpackDir string, ctx context.Context, logger *zap.Logger) error {
-	defer func() {
-		err := reader.Close()
-		// do not log ErrUnexpectedEOF - it means that client closed connection during upload
-		if err != nil && err != os.ErrClosed && err != io.ErrUnexpectedEOF {
-			logger.Error("cannot close", zap.Error(err))
-		}
-	}()
-
+func (t *BuildHandler) unpackTarZstd(reader io.Reader, unpackDir string, ctx context.Context) error {
 	command := exec.CommandContext(ctx, "tar", "--use-compress-program="+t.zstdPath, "-x", "-C", unpackDir)
 	command.Stdin = reader
 

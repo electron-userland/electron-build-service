@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/coreos/etcd/embed"
 	"github.com/develar/app-builder/pkg/util"
+	"go.uber.org/atomic"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -72,11 +73,12 @@ func start(logger *zap.Logger) error {
 	}
 
 	buildHandler := &BuildHandler{
-		logger:     logger,
-		stageDir:   internal.GetBuilderDirectory("stage"),
-		tempDir:    builderTmpDir,
-		zstdPath:   filepath.Join(zstdPath, "zstd"),
-		scriptPath: filepath.Join(scriptPath, "node_modules/app-builder-lib/out/remoteBuilder/builder-cli.js"),
+		logger:          logger,
+		stageDir:        internal.GetBuilderDirectory("stage"),
+		tempDir:         builderTmpDir,
+		zstdPath:        filepath.Join(zstdPath, "zstd"),
+		scriptPath:      filepath.Join(scriptPath, "node_modules/app-builder-lib/out/remoteBuilder/builder-cli.js"),
+		runningJobCount: atomic.NewInt32(0),
 	}
 
 	err = buildHandler.PrepareDirs()

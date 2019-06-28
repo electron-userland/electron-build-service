@@ -33,6 +33,8 @@ func newManagedSource(queue *PriorityQueue, ctx context.Context, logger *zap.Log
 		var topJob JobEntry
 
 		defer func() {
+			close(outputChannel)
+
 			if topJob != nil {
 				topJob.Cancel()
 				topJob = nil
@@ -47,7 +49,6 @@ func newManagedSource(queue *PriorityQueue, ctx context.Context, logger *zap.Log
 				job.Cancel()
 			}
 
-			close(outputChannel)
 			updatePendingJobCount()
 		}()
 

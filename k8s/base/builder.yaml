@@ -14,7 +14,7 @@ spec:
       labels: *LABELS
     spec:
       containers:
-        - image: electronuserland/build-service-builder@sha256:86014f240aaab96a79e338385b9a4a479a9127fe26c535f8493572c3ae7456ba
+        - image: electronuserland/build-service-builder@sha256:a3db1a9418e778bee96bc15a54035a7648f65442158dc98c726b4e0be9028a74
           name: builder
           env:
             - name: USE_EMBEDDED_ETCD

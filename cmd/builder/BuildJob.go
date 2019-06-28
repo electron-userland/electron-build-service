@@ -69,6 +69,7 @@ func (t *BuildJob) Run(ctx context.Context) {
 
 	if err != nil {
 		t.complete <- BuildJobResult{error: err}
+		close(t.complete)
 	}
 }
 
@@ -126,18 +127,17 @@ func (t *BuildJob) doBuild(buildContext context.Context, jobStartTime time.Time)
 	// reliable way to get result (since we cannot use out/err output)
 	rawResult, err := ioutil.ReadFile(filepath.Join(projectTempDir, "__build-result.json"))
 	if err != nil {
-		close(t.complete)
-		return nil
-	}
-
-	info, err := ioutil.ReadFile(filepath.Join(t.projectDir, "info.json"))
-	if err != nil {
-		t.logger.Error("cannot write project info", zap.Error(err))
+		return err
 	}
 
 	result, err := t.processResult(rawResult, projectOutDir)
 	if err != nil {
 		return err
+	}
+
+	info, err := ioutil.ReadFile(filepath.Join(t.projectDir, "info.json"))
+	if err != nil {
+		t.logger.Error("cannot write project info", zap.Error(err))
 	}
 
 	t.logger.Info("job completed",
@@ -148,9 +148,10 @@ func (t *BuildJob) doBuild(buildContext context.Context, jobStartTime time.Time)
 	)
 
 	t.complete <- *result
+	close(t.complete)
 
-	go t.removeAllFilesExceptArtifacts(projectTempDir)
-
+	// on complete connection will be not closed immediately, but client will download results, so, no need to execute remote in a new goroutine
+	t.removeAllFilesExceptArtifacts(projectTempDir)
 	return nil
 }
 

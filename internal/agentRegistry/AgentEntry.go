@@ -108,12 +108,13 @@ func createOrUpdateAgentEntry(key string, logger *zap.Logger, agentEntry *AgentE
 }
 
 func (t *AgentEntry) Update(jobCount int) {
-	if t.store == nil {
+	store := t.store
+	if store == nil {
 		t.logger.Error("cannot update job", zap.String("reason", "store is null"))
 		return
 	}
 
-	_, err := t.store.Put(context.Background(), t.Key, string([]byte{byte(runtime.NumCPU()), byte(jobCount)}), clientv3.WithLease(t.leaseId))
+	_, err := store.Put(context.Background(), t.Key, string([]byte{byte(runtime.NumCPU()), byte(jobCount)}), clientv3.WithLease(t.leaseId))
 	if err != nil {
 		t.logger.Error("cannot update job", zap.Error(err))
 	}

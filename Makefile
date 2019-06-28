@@ -13,8 +13,7 @@ docker:
 push-docker: docker
 	docker push electronuserland/build-service-builder:latest
 
-# don't forget to do push-docker
-bundle:
+bundle: push-docker
 	./scripts/set-image-digest.sh
 	make create-self-hosted
 
