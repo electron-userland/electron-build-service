@@ -25,6 +25,68 @@ spec:
     app: builder
   type: NodePort
 ---
+apiVersion: v1
+kind: Service
+metadata:
+  name: etcd-client
+spec:
+  ports:
+  - port: 2379
+    targetPort: 2379
+  selector:
+    app: etcd
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    etcd_node: etcd0
+  name: etcd0
+spec:
+  ports:
+  - name: client
+    port: 2379
+    targetPort: 2379
+  - name: server
+    port: 2380
+    targetPort: 2380
+  selector:
+    etcd_node: etcd0
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    etcd_node: etcd1
+  name: etcd1
+spec:
+  ports:
+  - name: client
+    port: 2379
+    targetPort: 2379
+  - name: server
+    port: 2380
+    targetPort: 2380
+  selector:
+    etcd_node: etcd1
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    etcd_node: etcd2
+  name: etcd2
+spec:
+  ports:
+  - name: client
+    port: 2379
+    targetPort: 2379
+  - name: server
+    port: 2380
+    targetPort: 2380
+  selector:
+    etcd_node: etcd2
+---
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -44,9 +106,7 @@ spec:
       - env:
         - name: BUILDER_HOST
           value: 0.0.0.0
-        - name: USE_EMBEDDED_ETCD
-          value: "true"
-        image: electronuserland/build-service-builder@sha256:a3db1a9418e778bee96bc15a54035a7648f65442158dc98c726b4e0be9028a74
+        image: electronuserland/build-service-builder@sha256:68bc76c22f8b57796865cbcaeb760be8384f54471ae3555ed8cd60a83508ed8d
         livenessProbe:
           failureThreshold: 3
           httpGet:
@@ -76,8 +136,6 @@ spec:
           readOnly: true
         - mountPath: /builder-tmp
           name: tmp
-        - mountPath: /builder-embedded-etcd
-          name: embedded-etcd
       terminationGracePeriodSeconds: 300
       volumes:
       - name: tls
@@ -86,6 +144,132 @@ spec:
       - emptyDir:
           medium: Memory
         name: tmp
-      - emptyDir:
-          medium: Memory
-        name: embedded-etcd
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    app: etcd
+    etcd_node: etcd0
+  name: etcd0
+spec:
+  containers:
+  - command:
+    - /usr/local/bin/etcd
+    - --name
+    - etcd0
+    - --initial-advertise-peer-urls
+    - http://etcd0:2380
+    - --listen-peer-urls
+    - http://0.0.0.0:2380
+    - --listen-client-urls
+    - http://0.0.0.0:2379
+    - --advertise-client-urls
+    - http://etcd0:2379
+    - --initial-cluster
+    - etcd0=http://etcd0:2380,etcd1=http://etcd1:2380,etcd2=http://etcd2:2380
+    - --initial-cluster-state
+    - new
+    - --data-dir
+    - /data-dir
+    image: quay.io/coreos/etcd:v3.3
+    name: etcd0
+    ports:
+    - containerPort: 2379
+      name: client
+    - containerPort: 2380
+      name: server
+    volumeMounts:
+    - mountPath: /data-dir
+      name: data-dir
+  restartPolicy: Always
+  volumes:
+  - emptyDir:
+      medium: Memory
+    name: data-dir
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    app: etcd
+    etcd_node: etcd1
+  name: etcd1
+spec:
+  containers:
+  - command:
+    - /usr/local/bin/etcd
+    - --name
+    - etcd1
+    - --initial-advertise-peer-urls
+    - http://etcd1:2380
+    - --listen-peer-urls
+    - http://0.0.0.0:2380
+    - --listen-client-urls
+    - http://0.0.0.0:2379
+    - --advertise-client-urls
+    - http://etcd1:2379
+    - --initial-cluster
+    - etcd0=http://etcd0:2380,etcd1=http://etcd1:2380,etcd2=http://etcd2:2380
+    - --initial-cluster-state
+    - new
+    - --data-dir
+    - /data-dir
+    image: quay.io/coreos/etcd:v3.3
+    name: etcd1
+    ports:
+    - containerPort: 2379
+      name: client
+    - containerPort: 2380
+      name: server
+    volumeMounts:
+    - mountPath: /data-dir
+      name: data-dir
+  restartPolicy: Always
+  volumes:
+  - emptyDir:
+      medium: Memory
+    name: data-dir
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    app: etcd
+    etcd_node: etcd2
+  name: etcd2
+spec:
+  containers:
+  - command:
+    - /usr/local/bin/etcd
+    - --name
+    - etcd2
+    - --initial-advertise-peer-urls
+    - http://etcd2:2380
+    - --listen-peer-urls
+    - http://0.0.0.0:2380
+    - --listen-client-urls
+    - http://0.0.0.0:2379
+    - --advertise-client-urls
+    - http://etcd2:2379
+    - --initial-cluster
+    - etcd0=http://etcd0:2380,etcd1=http://etcd1:2380,etcd2=http://etcd2:2380
+    - --initial-cluster-state
+    - new
+    - --data-dir
+    - /data-dir
+    image: quay.io/coreos/etcd:v3.3
+    name: etcd2
+    ports:
+    - containerPort: 2379
+      name: client
+    - containerPort: 2380
+      name: server
+    volumeMounts:
+    - mountPath: /data-dir
+      name: data-dir
+  restartPolicy: Always
+  volumes:
+  - emptyDir:
+      medium: Memory
+    name: data-dir

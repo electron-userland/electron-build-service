@@ -8,20 +8,16 @@
     ```
    
    Add label `builder=true` for every node where builder should be deployed.
-
-2. If not embedded etcd is used: Catalog Apps -> etcd-operator from Rancher Library (not from Helm).
-
-   Etcd Cluster Version: 3.2.26 (3.3.x not officially supported — https://github.com/coreos/etcd-operator/issues/1731).
    
-3. Import secret `tls.yaml` to create TLS secret. Or create using `Resources -> Secrets`:
+2. Import secret `tls.yaml` to create TLS secret. Or create using `Resources -> Secrets`:
     * name: `tls`,
     * data keys: `tls.cert` (expected bundle - first node cert, second certificate authority cert) and `tls.key`.
 
-4. Import secret `papertrail-destination.yaml`. Or create using `Resources -> Secrets`:
+3. Import secret `papertrail-destination.yaml`. Or create using `Resources -> Secrets`:
     * name: `papertrail-destination`, 
     * key: `papertrail-destination`, 
     * value: `syslog+tls://logsN.papertrailapp.com:N?filter.name=k8s_builder_*` + (see [papertrail destination](https://papertrailapp.com/account/destinations)).
-5. `make add-cluster-resources`.
+4. `make add-cluster-resources`.
 
 ## TLS
 

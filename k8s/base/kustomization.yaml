@@ -1,3 +1,4 @@
 resources:
+  - etcd.yaml
   - builder.yaml
   - builder-service.yaml

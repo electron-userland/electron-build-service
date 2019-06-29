@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/coreos/etcd/embed"
 	"github.com/develar/app-builder/pkg/util"
 	"go.uber.org/atomic"
 	"io/ioutil"
@@ -31,20 +30,6 @@ func main() {
 			log.Printf("cannot sync logger: %s", err)
 		}
 	}()
-
-	if util.IsEnvTrue("USE_EMBEDDED_ETCD") {
-		err := os.Setenv("ETCD_ENDPOINT", embed.DefaultListenClientURLs)
-		if err != nil {
-			logger.Fatal("cannot set env ETCD_ENDPOINT", zap.Error(err))
-		}
-
-		serverEtcd, err := internal.StartEmbeddedServer(logger)
-		if err != nil {
-			logger.Fatal("cannot start embedded etcd server", zap.Error(err))
-		}
-
-		defer serverEtcd.Close()
-	}
 
 	err := start(logger)
 	if err != nil {
@@ -118,7 +103,6 @@ func start(logger *zap.Logger) error {
 		zap.String("etcdKey", buildHandler.agentEntry.Key),
 		zap.String("zstdPath", buildHandler.zstdPath),
 		zap.String("scriptPath", buildHandler.scriptPath),
-		zap.Strings("env", os.Environ()),
 	)
 
 	internal.WaitUntilTerminated(server, 1*time.Minute, func() {

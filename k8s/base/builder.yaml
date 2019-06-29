@@ -14,11 +14,8 @@ spec:
       labels: *LABELS
     spec:
       containers:
-        - image: electronuserland/build-service-builder@sha256:a3db1a9418e778bee96bc15a54035a7648f65442158dc98c726b4e0be9028a74
+        - image: electronuserland/build-service-builder@sha256:68bc76c22f8b57796865cbcaeb760be8384f54471ae3555ed8cd60a83508ed8d
           name: builder
-          env:
-            - name: USE_EMBEDDED_ETCD
-              value: "true"
           ports:
             - containerPort: 443
               hostPort: 443
@@ -28,8 +25,6 @@ spec:
               readOnly: true
             - mountPath: /builder-tmp
               name: tmp
-            - mountPath: /builder-embedded-etcd
-              name: embedded-etcd
 
           readinessProbe:
             httpGet:
@@ -58,8 +53,5 @@ spec:
           secret:
             secretName: tls
         - name: tmp
-          emptyDir:
-            medium: Memory
-        - name: embedded-etcd
           emptyDir:
             medium: Memory

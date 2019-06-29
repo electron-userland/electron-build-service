@@ -42,13 +42,13 @@ type Runnable interface {
 type GoPool struct {
 	name string
 
-	waitGroup *sync.WaitGroup
+	waitGroup sync.WaitGroup
 	context   context.Context
 
 	queue *ManagedSource
 
-	pendingJobCount *atomic.Int32
-	runningJobCount *atomic.Int32
+	pendingJobCount atomic.Int32
+	runningJobCount atomic.Int32
 
 	JobMaxTime time.Duration
 
@@ -81,12 +81,10 @@ func (t *GoPool) GetRunningJobCount() int {
 func New(workerCount int, ctx context.Context, logger *zap.Logger) *GoPool {
 	managedSource := newManagedSource(NewPriorityQueue(), ctx, logger)
 	pool := &GoPool{
-		context:      ctx,
-		closeChannel: make(chan struct{}),
-		queue:        managedSource,
+		context: ctx,
+		queue:   managedSource,
 
-		pendingJobCount: atomic.NewInt32(0),
-		runningJobCount: atomic.NewInt32(0),
+		closeChannel: make(chan struct{}),
 	}
 
 	for index := 0; index < workerCount; index++ {

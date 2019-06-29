@@ -167,18 +167,7 @@ func (t *BuildHandler) executeUnpackTarZstd(w http.ResponseWriter, r *http.Reque
 	body := r.Body
 	err := t.unpackTarZstd(http.MaxBytesReader(w, body, maxRequestBody), projectDir, unpackContext)
 	closeError := body.Close()
-	// do not log ErrUnexpectedEOF - it means that client closed connection during upload
-	if closeError != nil && closeError != os.ErrClosed && err != io.ErrUnexpectedEOF {
-		logField := zap.Error(err)
-		if opErr, ok := err.(*net.OpError); ok {
-			if syscallErr, ok := opErr.Err.(*os.SyscallError); ok {
-				if syscallErr.Err == syscall.ECONNRESET {
-					logField = zap.String("reason", "connection reset by peer")
-				}
-			}
-		}
-		buildJob.logger.Error("cannot close", logField)
-	}
+	logCloseError(closeError, buildJob)
 
 	if err != nil {
 		// do not wrap error, stack is clear
@@ -194,6 +183,22 @@ func (t *BuildHandler) executeUnpackTarZstd(w http.ResponseWriter, r *http.Reque
 	)
 
 	return nil
+}
+
+func logCloseError(err error, buildJob *BuildJob) {
+	// do not log ErrUnexpectedEOF - it means that client closed connection during upload
+	if err != nil && err != os.ErrClosed && err != io.ErrUnexpectedEOF {
+		if opErr, ok := err.(*net.OpError); ok {
+			if syscallErr, ok := opErr.Err.(*os.SyscallError); ok {
+				if syscallErr.Err == syscall.ECONNRESET {
+					buildJob.logger.Error("cannot close", zap.String("reason", "connection reset by peer"))
+					return
+				}
+			}
+		}
+
+		buildJob.logger.Error("cannot close", zap.Error(err))
+	}
 }
 
 func (t *BuildHandler) doBuild(w http.ResponseWriter, r *http.Request, buildJob *BuildJob) error {
