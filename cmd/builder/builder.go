@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/develar/app-builder/pkg/download"
+	l "github.com/develar/app-builder/pkg/log"
 	"github.com/develar/errors"
 	"github.com/didip/tollbooth"
 	"github.com/didip/tollbooth/limiter"
@@ -24,6 +25,7 @@ import (
 
 func main() {
 	logger := internal.CreateLogger()
+	l.LOG = logger
 	defer func() {
 		err := logger.Sync()
 		if err != nil {

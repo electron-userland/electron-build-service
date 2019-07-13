@@ -40,15 +40,16 @@ RUN apt-get -qq install bsdtar lzip rpm binutils libopenjp2-tools \
   libnspr4 libnss3 libxss1 libappindicator3-1 libsecret-1-0 && \
   apt-mark hold libnspr4 libnss3 libxss1 libappindicator3-1 libsecret-1-0
 
-RUN curl -L https://nodejs.org/dist/v12.4.0/node-v12.4.0-linux-x64.tar.gz | tar xz -C /usr/local --strip-components=1 && \
+RUN curl -L https://nodejs.org/dist/v12.6.0/node-v12.6.0-linux-x64.tar.gz | tar xz -C /usr/local --strip-components=1 && \
   unlink /usr/local/CHANGELOG.md && unlink /usr/local/LICENSE && unlink /usr/local/README.md && \
   # https://github.com/npm/npm/issues/4531
   npm config set unsafe-perm true
 
 COPY node_modules /node_modules
 
-RUN ln -s /node_modules/7zip-bin/linux/x64/7za /usr/local/bin/7za && /node_modules/app-builder-bin/linux/x64/app-builder prefetch-tools && \
-  /node_modules/app-builder-bin/linux/x64/app-builder download-electron --configuration '[{"platform":"linux","arch":"x64","version":"5.0.5"}]'
+RUN ln -s /node_modules/7zip-bin/linux/x64/7za /usr/local/bin/7za && \
+  /node_modules/app-builder-bin/linux/x64/app-builder prefetch-tools && \
+  /node_modules/app-builder-bin/linux/x64/app-builder download-electron --configuration '[{"platform":"linux","arch":"x64","version":"5.0.6"}]'
 
 # fix error /usr/local/bundle/gems/fpm-1.5.0/lib/fpm/package/freebsd.rb:72:in `encode': "\xE2" from ASCII-8BIT to UTF-8 (Encoding::UndefinedConversionError)
 # http://jaredmarkell.com/docker-and-locales/

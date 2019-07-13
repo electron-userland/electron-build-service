@@ -14,7 +14,7 @@ spec:
       labels: *LABELS
     spec:
       containers:
-        - image: electronuserland/build-service-builder@sha256:68bc76c22f8b57796865cbcaeb760be8384f54471ae3555ed8cd60a83508ed8d
+        - image: electronuserland/build-service-builder@sha256:e484318f2ce17a3d99d30b9658e4dd9e5b5eb989cb38b8f82fe4a58bf20442cf
           name: builder
           ports:
             - containerPort: 443
