@@ -106,7 +106,7 @@ spec:
       - env:
         - name: BUILDER_HOST
           value: 0.0.0.0
-        image: electronuserland/build-service-builder@sha256:e484318f2ce17a3d99d30b9658e4dd9e5b5eb989cb38b8f82fe4a58bf20442cf
+        image: electronuserland/build-service-builder@sha256:88560aa85a2d088e14b92395d81900f416ae616285371509247fdd7dd3512ffc
         livenessProbe:
           failureThreshold: 3
           httpGet:
