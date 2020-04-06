@@ -38,7 +38,7 @@ add-cluster-resources: bundle
 	rancher kubectl apply -k k8s/overlays/production
 
 update-deps:
-	GOPROXY=https://proxy.golang.org go get -u ./cmd/builder
+	GOPROXY=https://proxy.golang.org go get -u -d ./cmd/builder
 	go mod tidy
 
 # rsync -r ~/Documents/electron-builder/packages/app-builder-lib/out/ ~/Documents/electron-build-service/node_modules/app-builder-lib/out
