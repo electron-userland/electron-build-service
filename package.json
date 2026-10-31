@@ -6,5 +6,6 @@
   },
   "dependencies": {
     "app-builder-lib": "22.5.1"
-  }
+  },
+  "packageManager": "yarn@4.10.3"
 }

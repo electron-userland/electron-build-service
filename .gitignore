@@ -6,3 +6,9 @@ vendor/
 .idea/workspace.xml
 
 /k8s/generated/production.yaml
+
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
